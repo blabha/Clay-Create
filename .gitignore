@@ -21,3 +21,7 @@ Thumbs.db
 # Entornos / secretos
 .env
 *.log
+
+# Datos pesados / generados
+*.ply
+*.mp4
