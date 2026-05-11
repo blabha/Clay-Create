@@ -7,15 +7,21 @@ from pathlib import Path
 # Settings
 # -----------------------------
 
-INPUT_FILE = "data/cloud.ply"
-OUTPUT_CLEAN_CLOUD = "output/clean_object.ply"
+INPUT_FILE = "data/auto_capture_20260509_120152.ply"
+OUTPUT_CLEAN_CLOUD = "output/auto_capture_20260509_120152.ply"
 
-VOXEL_SIZE = 0.02
+VOXEL_SIZE = 0.003
 
-NB_NEIGHBORS = 30
-STD_RATIO = 1.2
+NB_NEIGHBORS = 20
+STD_RATIO = 2.0
 
+REMOVE_FLOOR = True
 FLOOR_DISTANCE_THRESHOLD = 0.015
+OBJECT_HEIGHT_ABOVE_FLOOR = 0.006
+
+CROP_BY_HEIGHT = False
+HEIGHT_CROP_OFFSET = 0.08
+MIN_REMAINING_POINTS = 100
 
 
 # -----------------------------
@@ -61,6 +67,10 @@ def remove_noise(pcd):
 
 
 def remove_floor_plane(pcd):
+    if not REMOVE_FLOOR:
+        print("Skipping floor removal.")
+        return pcd
+
     print("Removing floor plane...")
 
     plane_model, inliers = pcd.segment_plane(
@@ -69,17 +79,38 @@ def remove_floor_plane(pcd):
         num_iterations=1000
     )
 
-    pcd_without_floor = pcd.select_by_index(
-        inliers,
-        invert=True
-    )
+    a, b, c, d = plane_model
+    points = np.asarray(pcd.points)
+    signed_distances = points @ np.array([a, b, c]) + d
 
+    positive_side = signed_distances > OBJECT_HEIGHT_ABOVE_FLOOR
+    negative_side = signed_distances < -OBJECT_HEIGHT_ABOVE_FLOOR
+
+    positive_z = points[positive_side, 2].mean() if positive_side.any() else -np.inf
+    negative_z = points[negative_side, 2].mean() if negative_side.any() else -np.inf
+
+    if negative_z > positive_z:
+        signed_distances = -signed_distances
+
+    object_indices = np.where(signed_distances > OBJECT_HEIGHT_ABOVE_FLOOR)[0]
+
+    pcd_without_floor = pcd.select_by_index(object_indices)
+
+    if len(pcd_without_floor.points) < MIN_REMAINING_POINTS:
+        print("Floor removal left too few points; keeping original cloud.")
+        return pcd
+
+    print(f"Floor points detected: {len(inliers)}")
     print(f"After floor removal: {len(pcd_without_floor.points)} points")
 
     return pcd_without_floor
 
 
 def crop_object_by_height(pcd):
+    if not CROP_BY_HEIGHT:
+        print("Skipping height crop.")
+        return pcd
+
     print("Cropping object by height...")
 
     points = np.asarray(pcd.points)
@@ -91,11 +122,21 @@ def crop_object_by_height(pcd):
     print(f"Z max: {z_max}")
 
     # kõrguse cutoff
-    height_cut = z_min + 0.08
+    z_range = z_max - z_min
+
+    if z_range <= HEIGHT_CROP_OFFSET:
+        print("Cloud is shorter than height crop offset; skipping height crop.")
+        return pcd
+
+    height_cut = z_min + HEIGHT_CROP_OFFSET
 
     indices = np.where(points[:, 2] > height_cut)[0]
 
     object_cloud = pcd.select_by_index(indices)
+
+    if len(object_cloud.points) < MIN_REMAINING_POINTS:
+        print("Height crop left too few points; keeping original cloud.")
+        return pcd
 
     print(f"Object points: {len(object_cloud.points)}")
 
@@ -104,6 +145,9 @@ def crop_object_by_height(pcd):
 
 def create_bounding_box(pcd):
     print("Creating bounding box...")
+
+    if len(pcd.points) < 4:
+        raise ValueError("Need at least 4 points to create a 3D bounding box.")
 
     bbox = pcd.get_oriented_bounding_box()
     bbox.color = (1, 0, 0)

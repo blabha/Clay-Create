@@ -132,7 +132,7 @@ Planned additions:
 * Better segmentation
 * GPU acceleration
 * Real-time visualization
-* Export tools for Blender / Rhino / Grasshopper
+* Export tools for Rhino / Grasshopper
 * Better scan optimization
 
 ---
