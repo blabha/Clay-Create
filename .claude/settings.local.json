@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:\\\\Users\\\\Bhavana\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -m pip install pyrealsense2 open3d numpy)",
+      "Bash(\"C:\\\\Users\\\\Bhavana\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -m pip install plotly)",
+      "Bash(\"C:\\\\Users\\\\Bhavana\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -c \"from openni import openni2; from openni import _openni2 as c_api; print\\('Import OK'\\)\")",
+      "Bash(\"C:\\\\Users\\\\Bhavana\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -u \"capture_pointcloud.py\")",
+      "Bash(\"C:\\\\Users\\\\Bhavana\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -u \"capture_pointcloud.py\" --voxel 5 --min-depth 0.6 --max-depth 1.5)",
+      "Bash('C:\\\\Users\\\\Bhavana\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe' -u -c ' *)"
+    ]
+  }
+}

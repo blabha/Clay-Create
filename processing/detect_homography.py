@@ -67,7 +67,7 @@ def _save_ply(path, points, colors):
 # ── ROI config ────────────────────────────────────────────────────────────────
 
 def _load_roi_config():
-    path = os.path.join(ROOT, "config", "roi_config.txt")
+    path = os.path.join(ROOT, "roi_config.txt")
     cfg = {}
     if os.path.exists(path):
         with open(path) as f:
@@ -301,7 +301,7 @@ def process(ply_path, open_viewer=True, resolution_mm=1.0,
 
 
 def find_latest_foreground():
-    files = glob.glob(os.path.join(ROOT, "output", "*_foreground.ply"))
+    files = glob.glob(os.path.join(ROOT, "point clouds", "*_foreground.ply"))
     if not files:
         return None
     return max(files, key=os.path.getmtime)

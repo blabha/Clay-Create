@@ -111,7 +111,7 @@ def render_heightmap(ply_path, resolution_mm=2, output_path=None):
 
 
 def find_latest_foreground():
-    files = glob.glob(os.path.join(ROOT, "output", "*_foreground.ply"))
+    files = glob.glob(os.path.join(ROOT, "point clouds", "*_foreground.ply"))
     if not files:
         return None
     return max(files, key=os.path.getmtime)

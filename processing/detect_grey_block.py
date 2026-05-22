@@ -382,7 +382,7 @@ if __name__ == "__main__":
         import subprocess
         py  = r"C:\Users\Bhavana\AppData\Local\Python\pythoncore-3.14-64\python.exe"
         ts  = datetime.now().strftime("%Y%m%d_%H%M%S")
-        ply = os.path.join(ROOT, "output", f"capture_{ts}.ply")
+        ply = os.path.join(ROOT, "point clouds", f"capture_{ts}.ply")
         r   = subprocess.run([py, os.path.join(ROOT, "capture", "capture_pointcloud.py"),
                               "--camera", "orbbec", "--rgb", "-o", ply])
         if r.returncode != 0 or not os.path.exists(ply):

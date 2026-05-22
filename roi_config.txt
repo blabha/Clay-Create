@@ -1,0 +1,6 @@
+x_min=-8.37
+x_max=8.02
+z_min=9.49
+z_max=25.64
+depth_min=73.60
+depth_max=77.40
