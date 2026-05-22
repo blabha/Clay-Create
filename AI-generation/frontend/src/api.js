@@ -1,0 +1,40 @@
+async function req(path, options = {}) {
+  const res = await fetch(path, options)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Request failed')
+  }
+  return res.json()
+}
+
+export const api = {
+  getState: () => req('/api/state'),
+
+  generate: (prompt, steps = 25) =>
+    req('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, steps }),
+    }),
+
+  uploadScan: (idx, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return req(`/api/tile/${idx}/upload-scan`, { method: 'POST', body: form })
+  },
+
+  drawScan: (idx, imageData) =>
+    req(`/api/tile/${idx}/draw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_data: imageData }),
+    }),
+
+  getSurface3d: (idx, res = 64) =>
+    req(`/api/tile/${idx}/surface3d?res=${res}`),
+
+  reset: () => req('/api/reset', { method: 'POST' }),
+
+  exportPngUrl: (idx) => `/api/export/png/${idx}`,
+  exportObjUrl: (idx) => `/api/export/obj/${idx}`,
+}

@@ -25,3 +25,6 @@ Thumbs.db
 # Datos pesados / generados
 *.ply
 *.mp4
+
+# AI model weights
+*.safetensors
