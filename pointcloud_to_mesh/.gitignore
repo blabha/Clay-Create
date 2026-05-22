@@ -1,0 +1,5 @@
+output/
+*.obj
+*.ply
+*.stl
+__pycache__/
