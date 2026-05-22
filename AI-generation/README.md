@@ -1,30 +1,46 @@
-# Clay Relief Pipeline
+# Clay Create
 
-9-tile clay carving simulation: Stable Diffusion → MiDaS heightmap → tile workflow → OBJ export.
+Co-creative clay relief fabrication system developed at IAAC Barcelona — MRAC01 Hardware III.
+A robot carves clay blocks forming a large wall relief. After each block is carved, a depth scan is uploaded; the system adapts all remaining block designs to maintain visual continuity with what was actually carved.
+
+---
+
+## Architecture
+
+```
+frontend (Vite / React — port 5173)
+        ↕  /api/* proxy
+backend  (FastAPI — port 8001)
+```
+
+**No Stable Diffusion model required.** Depth comes entirely from MiDaS + image luminance detail.
+
+---
 
 ## Setup
 
-### 1. Place the SD model
-
-Copy `v1-5-pruned-emaonly.safetensors` into:
-```
-CLAY-CREATE/models/v1-5-pruned-emaonly.safetensors
-```
-
-### 2. Backend
+### Backend
 
 ```bash
-cd backend
+cd AI-generation/backend
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
+
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --port 8001
 ```
 
-MiDaS weights are downloaded automatically from torch.hub on first run (~100 MB).
+MiDaS weights (~100 MB) are downloaded automatically from `torch.hub` on first run.
 
-### 3. Frontend
+### Frontend
 
 ```bash
-cd frontend
+cd AI-generation/frontend
 npm install
 npm run dev
 ```
@@ -33,25 +49,64 @@ Open **http://localhost:5173**
 
 ### Quick start (Windows)
 
-Double-click `start.bat` — it opens both servers in separate terminals.
+Run `start.bat` — opens backend and frontend in separate terminals.
 
 ---
 
-## Tile order
+## Pipeline
 
-```
-1 2 3
-4 5 6
-7 8 9
-```
+1. **Wall setup** — enter wall dimensions in cm; the system calculates the grid as `floor(dim / 15)` blocks per axis
+2. **Upload reference image** — center-cropped to the grid aspect ratio
+3. **Depth estimation** — MiDaS_small (80 % weight) + high-frequency luminance detail (20 %)
+4. **CLAHE + gamma** — contrast enhancement for sharp, deep relief
+5. **Tile split** — `cols × rows` tiles of 256 × 256 px each
 
-Work through tiles in sequence. For each tile:
-- **Paint deviations** — use the brush to simulate depth-camera error (white = raised, black = lowered)
-- **Upload scan** — or drop a grayscale PNG (e.g. from an actual depth camera)
+### Carving workflow
 
-After processing, edge corrections propagate into all uncarved neighbours with an 80 px linear fade.
+For each tile:
+- Click the tile → enter the **carver's name** → the tile is locked to that person
+- Upload a grayscale depth scan (PNG) from the depth camera
+- Deviation = `scanned − intended` is computed and displayed
+- All uncarved neighbour tiles are updated via **harmonic interpolation** for automatic seam continuity
+- Click **Regenerate Design** to manually re-run seam correction across all remaining tiles
 
-## Export
+Carver names are overlaid on completed tiles in the master heightmap view.
 
-- **PNG** — 256 × 256 grayscale heightmap
-- **OBJ** — 200 mm × 200 mm × 40 mm triangulated mesh (128² vertices)
+### Seam correction (Regenerate Design)
+
+Computes `scanned_edge − original_edge` at every shared boundary with a completed neighbour, spreads that additive correction ~26 px inward with exponential decay, and adds it to the original design. Interior of the tile is untouched — only the seam region is adjusted so contour lines remain continuous.
+
+---
+
+## Clay block specifications
+
+| Property | Value |
+|---|---|
+| Block size | 15 × 15 × 3 cm |
+| Carving depth range | 30 mm |
+| Tile resolution | 256 × 256 px |
+
+---
+
+## Export (per tile)
+
+| Format | Dimensions | Details |
+|---|---|---|
+| PNG | 256 × 256 px | Grayscale heightmap |
+| OBJ | 150 × 150 × 30 mm | Triangulated mesh, 128² vertices |
+
+---
+
+## Key files
+
+| File | Role |
+|---|---|
+| `backend/main.py` | FastAPI endpoints, `enhance_heightmap`, `crop_to_grid` |
+| `backend/pipeline/tile_manager.py` | Tile state, harmonic interpolation, seam correction, deviation tracking |
+| `backend/pipeline/midas_processor.py` | MiDaS depth estimation |
+| `backend/pipeline/exporter.py` | PNG and OBJ export |
+| `frontend/src/App.jsx` | Main app state, carver name modal, routing |
+| `frontend/src/components/CarverModal.jsx` | Name entry popup |
+| `frontend/src/components/MasterView.jsx` | Dynamic grid overlay with carver names |
+| `frontend/src/components/TileWorkflow.jsx` | Per-tile scan upload, deviation view, 3D surface |
+| `frontend/src/components/WallSetup.jsx` | Wall dimensions input and grid preview |

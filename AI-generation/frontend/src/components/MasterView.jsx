@@ -1,6 +1,6 @@
 const CELL = 140
 
-export function MasterView({ master, currentTile, completed, cols, rows, onSelectTile }) {
+export function MasterView({ master, currentTile, completed, cols, rows, carverNames = {}, onSelectTile }) {
   const displayW = cols * CELL
   const displayH = rows * CELL
   const nTiles = cols * rows
@@ -68,6 +68,25 @@ export function MasterView({ master, currentTile, completed, cols, rows, onSelec
                 >
                   {i + 1}
                 </text>
+                {isDone && carverNames[i] && (
+                  <>
+                    <rect
+                      x={x + 6} y={y + CELL - 28}
+                      width={Math.min(carverNames[i].length * 7.2 + 12, CELL - 12)}
+                      height={18}
+                      rx={4}
+                      fill="rgba(107,158,112,0.75)"
+                    />
+                    <text
+                      x={x + 12} y={y + CELL - 14}
+                      fill="#fff"
+                      fontSize={10} fontWeight="600"
+                      style={{ userSelect: 'none', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                    >
+                      {carverNames[i].length > 14 ? carverNames[i].slice(0, 13) + '…' : carverNames[i]}
+                    </text>
+                  </>
+                )}
               </g>
             )
           })}

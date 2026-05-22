@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
+import { CarverModal } from './components/CarverModal.jsx'
 import { ImageUpload } from './components/ImageUpload.jsx'
 import { MasterView } from './components/MasterView.jsx'
 import { TileWorkflow } from './components/TileWorkflow.jsx'
@@ -22,6 +23,8 @@ export default function App() {
   const [surface3d, setSurface3d] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [carverNames, setCarverNames] = useState({})   // { tileIdx: string }
+  const [pendingSelect, setPendingSelect] = useState(null)  // tile idx awaiting name
 
   useEffect(() => {
     api.getState().then(s => {
@@ -78,6 +81,19 @@ export default function App() {
   }
 
   function handleSelectTile(idx) {
+    const isDone = appState.completed.includes(idx)
+    if (!isDone && carverNames[idx] === undefined) {
+      setPendingSelect(idx)
+    } else {
+      setSelectedTile(idx)
+      handleLoadSurface(idx)
+    }
+  }
+
+  function handleNameConfirm(name) {
+    const idx = pendingSelect
+    setCarverNames(prev => ({ ...prev, [idx]: name }))
+    setPendingSelect(null)
     setSelectedTile(idx)
     handleLoadSurface(idx)
   }
@@ -88,6 +104,8 @@ export default function App() {
       setSurface3d(null)
       setSelectedTile(0)
       setWallConfig(null)
+      setCarverNames({})
+      setPendingSelect(null)
     })
   }
 
@@ -228,6 +246,7 @@ export default function App() {
                 completed={appState.completed}
                 cols={cols}
                 rows={rows}
+                carverNames={carverNames}
                 onSelectTile={handleSelectTile}
               />
             </div>
@@ -293,6 +312,14 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {pendingSelect !== null && (
+        <CarverModal
+          tileIdx={pendingSelect}
+          onConfirm={handleNameConfirm}
+          onCancel={() => setPendingSelect(null)}
+        />
+      )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
