@@ -1,6 +1,38 @@
+# Generated capture outputs
+output/
+
+# Loose generated files (legacy, before output/ folder)
+*.ply
+*.mp4
+*_color.png
+*_heightmap.png
+*_ortho_top.png
+*_ortho_front.png
+*_viewer.html
+roi_config.txt
+config/
+
+# Python
 .venv/
 __pycache__/
 *.pyc
 *.pyo
-*.ply
-*.mp4
+*.pyd
+.Python
+*.egg-info/
+
+# Wheel installers
+*.whl
+
+# Claude Code internals
+.claude/
+
+# Embedded repos
+Clay-Create/
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
