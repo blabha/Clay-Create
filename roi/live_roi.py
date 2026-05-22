@@ -17,6 +17,7 @@ import numpy as np
 import cv2
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
 
 W, H = 640, 480
 
@@ -185,7 +186,8 @@ def _compute_bbox(depth_mm, fx, fy, cx, cy, u0, v0, u1, v1):
 
 
 def _save_config(bbox):
-    path = os.path.join(HERE, "roi_config.txt")
+    os.makedirs(os.path.join(ROOT, "config"), exist_ok=True)
+    path = os.path.join(ROOT, "config", "roi_config.txt")
     with open(path, "w") as f:
         f.write(f"x_min={bbox['x_min']*100:.2f}\n")
         f.write(f"x_max={bbox['x_max']*100:.2f}\n")

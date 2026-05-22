@@ -15,6 +15,7 @@ import argparse
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
 
 
 def _load_ply(path):
@@ -110,7 +111,7 @@ def render_heightmap(ply_path, resolution_mm=2, output_path=None):
 
 
 def find_latest_foreground():
-    files = glob.glob(os.path.join(HERE, "*_foreground.ply"))
+    files = glob.glob(os.path.join(ROOT, "output", "*_foreground.ply"))
     if not files:
         return None
     return max(files, key=os.path.getmtime)
@@ -129,7 +130,7 @@ def main():
     if ply_path is None:
         ply_path = find_latest_foreground()
         if ply_path is None:
-            print("No *_foreground.ply found in", HERE)
+            print("No *_foreground.ply found in", os.path.join(ROOT, "output"))
             sys.exit(1)
         print(f"Auto-selected: {os.path.basename(ply_path)}")
 

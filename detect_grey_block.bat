@@ -5,5 +5,5 @@ if "%~1"=="" (
     pause
     exit /b 1
 )
-"C:\Users\Bhavana\AppData\Local\Python\pythoncore-3.14-64\python.exe" "c:\Users\Bhavana\Documents\Hardware 3\detect_grey_block.py" %*
+"C:\Users\Bhavana\AppData\Local\Python\pythoncore-3.14-64\python.exe" "c:\Users\Bhavana\Documents\Hardware 3\processing\detect_grey_block.py" %*
 pause

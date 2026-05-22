@@ -14,8 +14,9 @@ import os
 import argparse
 from datetime import datetime
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(ROOT, "capture"))
+sys.path.insert(0, os.path.join(ROOT, "processing"))
 
 import capture_pointcloud as cap
 import detect_grey_block  as det
@@ -23,7 +24,7 @@ import detect_grey_block  as det
 
 def _load_roi_config():
     """Load bounding box from roi_config.txt saved by live_roi.py, if present."""
-    path = os.path.join(HERE, "roi_config.txt")
+    path = os.path.join(ROOT, "config", "roi_config.txt")
     if not os.path.exists(path):
         return {}
     cfg = {}
@@ -62,7 +63,7 @@ def main():
 
     # ── Step 1: capture ───────────────────────────────────────────────────────
     ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_ply = os.path.join(HERE, f"capture_{ts}.ply")
+    out_ply = os.path.join(ROOT, "output", f"capture_{ts}.ply")
 
     print("=" * 60)
     print("STEP 1 — Live Orbbec capture")
