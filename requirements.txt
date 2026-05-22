@@ -1,3 +1,22 @@
+# Core — needed by all scripts
+numpy
+opencv-python
+openni
+plotly
+scipy
+scikit-learn
+matplotlib
+
+# Optional — iPad LiDAR streaming (ipad_stream.py)
 open3d
 record3d
-opencv-python
+
+# Optional — YOLO object segmentation (segment_pointcloud.py)
+ultralytics
+
+# Optional — Intel RealSense camera (capture_pointcloud.py --camera realsense)
+# pyrealsense2
+
+# Optional — ZED camera (capture_pointcloud.py --camera zed)
+# Install via the ZED SDK, then: python <ZED_SDK>/get_python_api.py
+# pyzed
