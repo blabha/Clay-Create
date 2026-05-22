@@ -6,8 +6,7 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from scipy.ndimage import gaussian_filter
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from PIL import Image
@@ -15,14 +14,13 @@ from pydantic import BaseModel
 
 from pipeline.exporter import export_obj, export_png
 from pipeline.midas_processor import MiDaSProcessor
-from pipeline.sd_generator import SDGenerator
-from pipeline.tile_manager import TileManager
+from pipeline.tile_manager import TILE_SIZE, TileManager
 
 app = FastAPI(title="Clay Relief Pipeline")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,7 +28,6 @@ app.add_middleware(
 
 # ── global session state (single user, in-memory) ─────────────────────
 tile_manager = TileManager()
-sd_gen = SDGenerator()
 midas = MiDaSProcessor()
 
 
@@ -52,11 +49,29 @@ def state_response():
     return tile_manager.to_state_dict(arr_to_b64)
 
 
+def crop_to_grid(image: Image.Image, cols: int, rows: int) -> Image.Image:
+    """Center-crop image to cols:rows aspect ratio, then resize to exact grid pixels."""
+    target_aspect = cols / rows
+    w, h = image.size
+    img_aspect = w / h
+
+    if img_aspect > target_aspect:
+        new_w = int(h * target_aspect)
+        left = (w - new_w) // 2
+        image = image.crop((left, 0, left + new_w, h))
+    else:
+        new_h = int(w / target_aspect)
+        top = (h - new_h) // 2
+        image = image.crop((0, top, w, top + new_h))
+
+    return image.resize((cols * TILE_SIZE, rows * TILE_SIZE), Image.LANCZOS)
+
+
 def enhance_heightmap(image: Image.Image, midas_depth: np.ndarray,
                       texture_weight: float = 0.72) -> np.ndarray:
     """
-    Blend SD image luminance with MiDaS depth, smooth for clay-like shallow relief.
-    Gentle CLAHE preserves pattern without creating jagged spikes.
+    Blend image luminance (sharp surface detail) with MiDaS depth (coarse structure).
+    No Gaussian smoothing — preserves crispness.
     """
     img_rgb = np.array(image.convert("RGB"))
     img_lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
@@ -67,29 +82,17 @@ def enhance_heightmap(image: Image.Image, midas_depth: np.ndarray,
         pil = Image.fromarray((luminance * 255).astype(np.uint8))
         luminance = np.array(pil.resize((w, h), Image.LANCZOS), dtype=np.float32) / 255.0
 
-    # Gentle CLAHE — enough to reveal pattern, not so much that it spikes
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     lum_clahe = clahe.apply((luminance * 255).astype(np.uint8)).astype(np.float32) / 255.0
 
-    # Blend texture detail with coarse MiDaS depth
     blended = texture_weight * lum_clahe + (1.0 - texture_weight) * midas_depth
 
-    # Gaussian smooth → gradual clay-like transitions, no jagged edges
-    smoothed = gaussian_filter(blended, sigma=1.8)
-
-    # Single gentle CLAHE pass to recover contrast lost in smoothing
-    enhanced = clahe.apply((smoothed * 255).astype(np.uint8)).astype(np.float32) / 255.0
-
+    enhanced = clahe.apply((blended * 255).astype(np.uint8)).astype(np.float32) / 255.0
     lo, hi = enhanced.min(), enhanced.max()
     return (enhanced - lo) / (hi - lo + 1e-6)
 
 
 # ── request models ────────────────────────────────────────────────────
-
-class PromptRequest(BaseModel):
-    prompt: str
-    steps: int = 25
-
 
 class DrawRequest(BaseModel):
     image_data: str   # base64 data URL
@@ -103,27 +106,30 @@ async def get_state():
 
 
 @app.post("/api/generate")
-async def generate(req: PromptRequest):
+async def generate(
+    file: UploadFile = File(...),
+    cols: int = Form(...),
+    rows: int = Form(...),
+):
     """
-    Run the full SD→MiDaS→tile pipeline.
-    Heavy blocking work is offloaded to a thread so the event loop stays free.
+    Upload an image → center-crop to wall grid → MiDaS depth + luminance blend → tiles.
     """
+    data = await file.read()
+
     def _pipeline():
-        image = sd_gen.generate(req.prompt, steps=req.steps)
-        midas_depth = midas.process(image)
+        image = Image.open(io.BytesIO(data)).convert("RGB")
+        image = crop_to_grid(image, cols, rows)
+        midas_depth = midas.process(image, out_h=rows * TILE_SIZE, out_w=cols * TILE_SIZE)
         heightmap = enhance_heightmap(image, midas_depth)
-        tile_manager.initialize(heightmap)
+        tile_manager.initialize(heightmap, cols, rows)
 
     try:
         await asyncio.to_thread(_pipeline)
         return state_response()
-    except FileNotFoundError as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         tb = traceback.format_exc()
-        print(tb)                                    # full trace in backend terminal
-        raise HTTPException(status_code=500, detail=tb)   # full trace to frontend
+        print(tb)
+        raise HTTPException(status_code=500, detail=tb)
 
 
 @app.post("/api/tile/{idx}/upload-scan")
@@ -153,8 +159,8 @@ async def draw_scan(idx: int, req: DrawRequest):
 async def surface3d(idx: int, res: int = 64):
     if not tile_manager.initialized:
         raise HTTPException(status_code=400, detail="Not initialized")
-    if not (0 <= idx <= 8):
-        raise HTTPException(status_code=400, detail="Index 0-8 only")
+    if not (0 <= idx < tile_manager.n_tiles):
+        raise HTTPException(status_code=400, detail=f"Index 0–{tile_manager.n_tiles - 1} only")
     return tile_manager.get_surface3d(idx, res)
 
 
@@ -189,8 +195,8 @@ async def reset():
 def _check_ready(idx: int):
     if not tile_manager.initialized:
         raise HTTPException(status_code=400, detail="Not initialized — generate first")
-    if not (0 <= idx <= 8):
-        raise HTTPException(status_code=400, detail="Tile index must be 0–8")
+    if not (0 <= idx < tile_manager.n_tiles):
+        raise HTTPException(status_code=400, detail=f"Tile index must be 0–{tile_manager.n_tiles - 1}")
 
 
 def _get_tile(idx: int) -> np.ndarray:

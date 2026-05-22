@@ -1,19 +1,22 @@
-const DISPLAY = 450   // px — rendered size of the master canvas
-const CELL = DISPLAY / 3
+const CELL = 120   // px per tile in the display
 
-export function MasterView({ master, currentTile, completed, onSelectTile }) {
+export function MasterView({ master, currentTile, completed, cols, rows, onSelectTile }) {
+  const displayW = cols * CELL
+  const displayH = rows * CELL
+  const nTiles = cols * rows
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
-        Master Heightmap (768 px)
+        Master Heightmap — {cols} × {rows} grid ({cols * 256} × {rows * 256} px)
       </div>
 
-      <div style={{ position: 'relative', width: DISPLAY, height: DISPLAY, flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: displayW, height: displayH, flexShrink: 0 }}>
         {master
-          ? <img src={master} width={DISPLAY} height={DISPLAY}
+          ? <img src={master} width={displayW} height={displayH}
               style={{ display: 'block', imageRendering: 'pixelated' }} />
           : <div style={{
-              width: DISPLAY, height: DISPLAY, background: 'var(--surface2)',
+              width: displayW, height: displayH, background: 'var(--surface2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'var(--text-muted)', fontSize: 13,
             }}>
@@ -21,25 +24,32 @@ export function MasterView({ master, currentTile, completed, onSelectTile }) {
             </div>
         }
 
-        {/* SVG overlay — grid + tile highlighting */}
+        {/* SVG overlay — grid lines + tile highlighting */}
         <svg
-          width={DISPLAY} height={DISPLAY}
+          width={displayW} height={displayH}
           style={{ position: 'absolute', inset: 0, pointerEvents: master ? 'all' : 'none' }}
         >
-          {/* grid lines */}
-          {[1, 2].map(i => (
-            <g key={i}>
-              <line x1={i * CELL} y1={0} x2={i * CELL} y2={DISPLAY}
-                stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
-              <line x1={0} y1={i * CELL} x2={DISPLAY} y2={i * CELL}
-                stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
-            </g>
+          {/* vertical grid lines */}
+          {Array.from({ length: cols - 1 }, (_, i) => (
+            <line key={`v${i}`}
+              x1={(i + 1) * CELL} y1={0} x2={(i + 1) * CELL} y2={displayH}
+              stroke="rgba(255,255,255,0.3)" strokeWidth={1}
+            />
+          ))}
+          {/* horizontal grid lines */}
+          {Array.from({ length: rows - 1 }, (_, i) => (
+            <line key={`h${i}`}
+              x1={0} y1={(i + 1) * CELL} x2={displayW} y2={(i + 1) * CELL}
+              stroke="rgba(255,255,255,0.3)" strokeWidth={1}
+            />
           ))}
 
           {/* tile rects */}
-          {Array.from({ length: 9 }, (_, i) => {
-            const r = Math.floor(i / 3), c = i % 3
-            const x = c * CELL, y = r * CELL
+          {Array.from({ length: nTiles }, (_, i) => {
+            const r = Math.floor(i / cols)
+            const c = i % cols
+            const x = c * CELL
+            const y = r * CELL
             const isActive = i === currentTile
             const isDone = completed.includes(i)
             return (
@@ -51,9 +61,9 @@ export function MasterView({ master, currentTile, completed, onSelectTile }) {
                   strokeWidth={isActive ? 2.5 : 1.5}
                 />
                 <text
-                  x={x + 8} y={y + 20}
-                  fill={isActive ? '#f0c040' : isDone ? '#3ddc84' : 'rgba(255,255,255,0.6)'}
-                  fontSize={15}
+                  x={x + 7} y={y + 18}
+                  fill={isActive ? '#f0c040' : isDone ? '#3ddc84' : 'rgba(255,255,255,0.5)'}
+                  fontSize={13}
                   fontWeight="bold"
                   style={{ userSelect: 'none' }}
                 >

@@ -10,12 +10,13 @@ async function req(path, options = {}) {
 export const api = {
   getState: () => req('/api/state'),
 
-  generate: (prompt, steps = 25) =>
-    req('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, steps }),
-    }),
+  generate: (imageFile, cols, rows) => {
+    const form = new FormData()
+    form.append('file', imageFile)
+    form.append('cols', cols)
+    form.append('rows', rows)
+    return req('/api/generate', { method: 'POST', body: form })
+  },
 
   uploadScan: (idx, file) => {
     const form = new FormData()

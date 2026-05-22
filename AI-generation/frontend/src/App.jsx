@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
+import { ImageUpload } from './components/ImageUpload.jsx'
 import { MasterView } from './components/MasterView.jsx'
-import { PromptInput } from './components/PromptInput.jsx'
 import { TileWorkflow } from './components/TileWorkflow.jsx'
+import { WallSetup } from './components/WallSetup.jsx'
 
 const EMPTY_STATE = {
   initialized: false,
+  cols: 3,
+  rows: 3,
   current_tile: 0,
   completed: [],
   master: null,
@@ -14,16 +17,21 @@ const EMPTY_STATE = {
 
 export default function App() {
   const [appState, setAppState] = useState(EMPTY_STATE)
+  const [wallConfig, setWallConfig] = useState(null)   // { cols, rows, widthCm, heightCm }
   const [selectedTile, setSelectedTile] = useState(0)
   const [surface3d, setSurface3d] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Load state once on mount (in case backend already has session)
+  // Restore any existing backend session on mount
   useEffect(() => {
-    api.getState()
-      .then(s => { setAppState(s); if (s.initialized) setSelectedTile(s.current_tile ?? 0) })
-      .catch(() => {})
+    api.getState().then(s => {
+      setAppState(s)
+      if (s.initialized) {
+        setWallConfig({ cols: s.cols, rows: s.rows, widthCm: s.cols * 15, heightCm: s.rows * 15 })
+        setSelectedTile(s.current_tile ?? 0)
+      }
+    }).catch(() => {})
   }, [])
 
   const withLoading = useCallback(async (fn) => {
@@ -32,7 +40,6 @@ export default function App() {
     try {
       const newState = await fn()
       setAppState(newState)
-      // Default selection: current_tile or 0
       if (newState.initialized) {
         setSelectedTile(t => newState.completed.includes(t) ? t : (newState.current_tile ?? t))
       }
@@ -44,9 +51,9 @@ export default function App() {
     }
   }, [])
 
-  async function handleGenerate(prompt, steps) {
+  async function handleGenerate(imageFile) {
     setSurface3d(null)
-    await withLoading(() => api.generate(prompt, steps))
+    await withLoading(() => api.generate(imageFile, wallConfig.cols, wallConfig.rows))
     setSelectedTile(0)
   }
 
@@ -72,41 +79,76 @@ export default function App() {
     handleLoadSurface(idx)
   }
 
+  function handleReset() {
+    api.reset().then(s => {
+      setAppState(s)
+      setSurface3d(null)
+      setSelectedTile(0)
+      setWallConfig(null)
+    })
+  }
+
+  const cols = appState.initialized ? appState.cols : (wallConfig?.cols ?? 3)
+  const rows = appState.initialized ? appState.rows : (wallConfig?.rows ?? 3)
+  const nTiles = appState.tiles.length
   const currentTile = appState.tiles[selectedTile] ?? null
-  const allDone = appState.initialized && appState.completed.length === 9
+  const allDone = appState.initialized && appState.completed.length === nTiles
 
   return (
     <div style={{ minHeight: '100vh', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
       {/* ── Header ── */}
       <header style={{ display: 'flex', alignItems: 'center', gap: 16, borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.5 }}>Clay Relief Pipeline</h1>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>3 × 3 tile carving simulation</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            {appState.initialized
+              ? `${cols} × ${rows} grid — ${cols * 15} × ${rows * 15} cm wall`
+              : '15 cm × 15 cm × 3 cm clay blocks'}
+          </p>
         </div>
-        {appState.initialized && (
+        {(wallConfig || appState.initialized) && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {appState.completed.length}/9 tiles carved
-            </span>
-            {allDone && (
-              <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
-                All done!
+            {appState.initialized && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {appState.completed.length}/{nTiles} tiles carved
               </span>
             )}
-            <button
-              className="danger"
-              onClick={() => { api.reset().then(s => { setAppState(s); setSurface3d(null); setSelectedTile(0) }) }}
-            >
-              Reset
-            </button>
+            {allDone && (
+              <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>All done!</span>
+            )}
+            <button className="danger" onClick={handleReset}>Reset</button>
           </div>
         )}
       </header>
 
-      {/* ── Prompt input ── */}
-      <section className="card">
-        <PromptInput onGenerate={handleGenerate} loading={loading} />
-      </section>
+      {/* ── Step 1: Wall setup ── */}
+      {!wallConfig && !appState.initialized && (
+        <section className="card">
+          <WallSetup onConfirm={setWallConfig} />
+        </section>
+      )}
+
+      {/* ── Step 2: Image upload ── */}
+      {wallConfig && !appState.initialized && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              style={{ fontSize: 12, padding: '4px 10px' }}
+              onClick={() => setWallConfig(null)}
+              disabled={loading}
+            >
+              ← Change layout
+            </button>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {wallConfig.cols} × {wallConfig.rows} grid ({wallConfig.cols * wallConfig.rows} blocks, {wallConfig.cols * 15} × {wallConfig.rows * 15} cm)
+            </span>
+          </div>
+          <section className="card">
+            <ImageUpload onGenerate={handleGenerate} loading={loading} />
+          </section>
+        </>
+      )}
 
       {/* ── Error banner ── */}
       {error && (
@@ -117,6 +159,8 @@ export default function App() {
           borderRadius: 8,
           padding: '10px 16px',
           fontSize: 13,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
         }}>
           {error}
         </div>
@@ -131,6 +175,8 @@ export default function App() {
               master={appState.master}
               currentTile={appState.current_tile}
               completed={appState.completed}
+              cols={cols}
+              rows={rows}
               onSelectTile={handleSelectTile}
             />
           </div>
@@ -175,15 +221,15 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Empty state ── */}
-      {!appState.initialized && !loading && (
+      {/* ── Loading state ── */}
+      {loading && !appState.initialized && (
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           gap: 12, color: 'var(--text-muted)', paddingTop: 40,
         }}>
           <div style={{ fontSize: 48 }}>◻◻◻</div>
-          <p>Enter a prompt above and click Generate to start the pipeline.</p>
+          <p>Processing image… this may take a moment on first run (MiDaS loading).</p>
         </div>
       )}
     </div>

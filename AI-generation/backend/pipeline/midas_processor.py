@@ -34,8 +34,8 @@ class MiDaSProcessor:
         self._model.to(self._device).eval()
         print(f"MiDaS loaded on {self._device}.")
 
-    def process(self, image: Image.Image) -> np.ndarray:
-        """Return a float32 [0, 1] grayscale heightmap at 512×512."""
+    def process(self, image: Image.Image, out_h: int = 512, out_w: int = 512) -> np.ndarray:
+        """Return a float32 [0, 1] grayscale heightmap at out_h × out_w."""
         self._load()
         img_rgb = np.array(image.convert("RGB"))
         batch = _preprocess(img_rgb).to(self._device)
@@ -44,7 +44,7 @@ class MiDaSProcessor:
             pred = self._model(batch)
             pred = F.interpolate(
                 pred.unsqueeze(1),
-                size=(512, 512),
+                size=(out_h, out_w),
                 mode="bicubic",
                 align_corners=False,
             ).squeeze()
