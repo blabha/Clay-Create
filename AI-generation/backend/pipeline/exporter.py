@@ -14,11 +14,11 @@ def export_png(heightmap: np.ndarray) -> io.BytesIO:
 def export_obj(
     heightmap: np.ndarray,
     resolution: int = 128,
-    width_mm: float = 200.0,
-    height_mm: float = 200.0,
-    max_depth_mm: float = 20.0,
+    width_mm: float = 150.0,
+    height_mm: float = 150.0,
+    max_depth_mm: float = 30.0,
 ) -> io.BytesIO:
-    """Triangulated mesh with physical dimensions (200×200×20 mm)."""
+    """Triangulated mesh with physical dimensions (150×150×30 mm)."""
     pil = Image.fromarray((np.clip(heightmap, 0, 1) * 255).astype(np.uint8))
     pil = pil.resize((resolution, resolution), Image.LANCZOS)
     hmap = np.array(pil, dtype=np.float32) / 255.0

@@ -12,7 +12,7 @@ export function Surface3D({ surfaceData }) {
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
         scene: {
-          aspectratio: { x: 1, y: 1, z: 0.10 },   // 20mm depth / 200mm width = 0.1
+          aspectratio: { x: 1, y: 1, z: 0.20 },   // 30mm depth / 150mm width = 0.2
           camera: { eye: { x: 1.4, y: -1.4, z: 0.7 } },
           xaxis: { showticklabels: false, showgrid: false, zeroline: false, title: '' },
           yaxis: { showticklabels: false, showgrid: false, zeroline: false, title: '' },

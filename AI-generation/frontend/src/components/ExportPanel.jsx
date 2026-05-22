@@ -28,7 +28,7 @@ export function ExportPanel({ tileIdx, enabled }) {
         </button>
       </div>
       <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-        OBJ: 200 mm × 200 mm × 20 mm, triangulated, 128² resolution
+        OBJ: 150 mm × 150 mm × 30 mm, triangulated, 128² resolution
       </p>
     </div>
   )

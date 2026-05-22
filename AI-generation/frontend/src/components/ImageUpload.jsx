@@ -52,7 +52,7 @@ export function ImageUpload({ onGenerate, loading }) {
             justifyContent: 'center',
             gap: 8,
             cursor: loading ? 'not-allowed' : 'pointer',
-            background: dragging ? 'rgba(240,192,64,0.06)' : 'var(--surface2)',
+            background: dragging ? 'rgba(184,112,80,0.07)' : 'var(--surface2)',
             transition: 'border-color 0.15s, background 0.15s',
             padding: '12px 16px',
           }}

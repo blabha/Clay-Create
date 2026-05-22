@@ -98,13 +98,13 @@ export function DrawingCanvas({ tileImage, onSubmit, loading }) {
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={() => updateBrush({ mode: 'raise' })}
-            style={brushState.mode === 'raise' ? { background: 'var(--accent)', color: '#111' } : {}}
+            style={brushState.mode === 'raise' ? { background: 'var(--accent)', color: '#FAF8F5', borderColor: 'var(--accent)' } : {}}
           >
             ↑ Raise
           </button>
           <button
             onClick={() => updateBrush({ mode: 'lower' })}
-            style={brushState.mode === 'lower' ? { background: 'var(--red)', color: '#fff' } : {}}
+            style={brushState.mode === 'lower' ? { background: 'var(--red)', color: '#FAF8F5', borderColor: 'var(--red)' } : {}}
           >
             ↓ Lower
           </button>
