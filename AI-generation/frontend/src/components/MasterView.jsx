@@ -1,4 +1,4 @@
-const CELL = 120   // px per tile in the display
+const CELL = 120
 
 export function MasterView({ master, currentTile, completed, cols, rows, onSelectTile }) {
   const displayW = cols * CELL
@@ -24,32 +24,25 @@ export function MasterView({ master, currentTile, completed, cols, rows, onSelec
             </div>
         }
 
-        {/* SVG overlay — grid lines + tile highlighting */}
         <svg
           width={displayW} height={displayH}
           style={{ position: 'absolute', inset: 0, pointerEvents: master ? 'all' : 'none' }}
         >
-          {/* vertical grid lines */}
           {Array.from({ length: cols - 1 }, (_, i) => (
             <line key={`v${i}`}
               x1={(i + 1) * CELL} y1={0} x2={(i + 1) * CELL} y2={displayH}
-              stroke="rgba(255,255,255,0.3)" strokeWidth={1}
+              stroke="rgba(255,255,255,0.25)" strokeWidth={1}
             />
           ))}
-          {/* horizontal grid lines */}
           {Array.from({ length: rows - 1 }, (_, i) => (
             <line key={`h${i}`}
               x1={0} y1={(i + 1) * CELL} x2={displayW} y2={(i + 1) * CELL}
-              stroke="rgba(255,255,255,0.3)" strokeWidth={1}
+              stroke="rgba(255,255,255,0.25)" strokeWidth={1}
             />
           ))}
-
-          {/* tile rects */}
           {Array.from({ length: nTiles }, (_, i) => {
-            const r = Math.floor(i / cols)
-            const c = i % cols
-            const x = c * CELL
-            const y = r * CELL
+            const r = Math.floor(i / cols), c = i % cols
+            const x = c * CELL, y = r * CELL
             const isActive = i === currentTile
             const isDone = completed.includes(i)
             return (
@@ -60,12 +53,9 @@ export function MasterView({ master, currentTile, completed, cols, rows, onSelec
                   stroke={isActive ? '#f0c040' : isDone ? '#3ddc84' : 'rgba(255,255,255,0)'}
                   strokeWidth={isActive ? 2.5 : 1.5}
                 />
-                <text
-                  x={x + 7} y={y + 18}
+                <text x={x + 7} y={y + 18}
                   fill={isActive ? '#f0c040' : isDone ? '#3ddc84' : 'rgba(255,255,255,0.5)'}
-                  fontSize={13}
-                  fontWeight="bold"
-                  style={{ userSelect: 'none' }}
+                  fontSize={13} fontWeight="bold" style={{ userSelect: 'none' }}
                 >
                   {i + 1}
                 </text>

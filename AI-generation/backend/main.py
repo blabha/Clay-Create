@@ -67,11 +67,10 @@ def crop_to_grid(image: Image.Image, cols: int, rows: int) -> Image.Image:
     return image.resize((cols * TILE_SIZE, rows * TILE_SIZE), Image.LANCZOS)
 
 
-def enhance_heightmap(image: Image.Image, midas_depth: np.ndarray,
-                      texture_weight: float = 0.72) -> np.ndarray:
+def enhance_heightmap(image: Image.Image, midas_depth: np.ndarray) -> np.ndarray:
     """
-    Blend image luminance (sharp surface detail) with MiDaS depth (coarse structure).
-    No Gaussian smoothing — preserves crispness.
+    True depth map: MiDaS provides the coarse 3D structure; image high-frequency
+    detail sharpens it without overriding depth ordering.
     """
     img_rgb = np.array(image.convert("RGB"))
     img_lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
@@ -82,14 +81,31 @@ def enhance_heightmap(image: Image.Image, midas_depth: np.ndarray,
         pil = Image.fromarray((luminance * 255).astype(np.uint8))
         luminance = np.array(pil.resize((w, h), Image.LANCZOS), dtype=np.float32) / 255.0
 
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    lum_clahe = clahe.apply((luminance * 255).astype(np.uint8)).astype(np.float32) / 255.0
+    # Normalise MiDaS depth
+    d_lo, d_hi = midas_depth.min(), midas_depth.max()
+    depth_norm = (midas_depth - d_lo) / (d_hi - d_lo + 1e-6)
 
-    blended = texture_weight * lum_clahe + (1.0 - texture_weight) * midas_depth
+    # Extract only high-frequency surface detail from the image
+    # (subtract a mildly blurred version to isolate fine texture)
+    lum_blur = cv2.GaussianBlur(luminance, (0, 0), sigmaX=8)
+    hf_detail = luminance - lum_blur          # fine bumps / ridges, mean ≈ 0
 
-    enhanced = clahe.apply((blended * 255).astype(np.uint8)).astype(np.float32) / 255.0
+    # Add fine detail on top of real depth — 80% MiDaS, 20% surface texture
+    combined = 0.80 * depth_norm + 0.20 * (hf_detail + 0.5)
+
+    # Strong CLAHE for punchy local contrast
+    clahe = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply((np.clip(combined, 0, 1) * 255).astype(np.uint8)).astype(np.float32) / 255.0
+
+    # Gentle blur to soften fine texture lines while preserving large-scale depth
+    enhanced = cv2.GaussianBlur(enhanced, (0, 0), sigmaX=0.3)
+
+    # Stretch full dynamic range to [0, 1]
     lo, hi = enhanced.min(), enhanced.max()
-    return (enhanced - lo) / (hi - lo + 1e-6)
+    enhanced = (enhanced - lo) / (hi - lo + 1e-6)
+
+    # Gamma < 1 lifts midtones; increases perceived contrast in the depth map
+    return np.power(enhanced, 0.8)
 
 
 # ── request models ────────────────────────────────────────────────────
@@ -119,6 +135,7 @@ async def generate(
     def _pipeline():
         image = Image.open(io.BytesIO(data)).convert("RGB")
         image = crop_to_grid(image, cols, rows)
+
         midas_depth = midas.process(image, out_h=rows * TILE_SIZE, out_w=cols * TILE_SIZE)
         heightmap = enhance_heightmap(image, midas_depth)
         tile_manager.initialize(heightmap, cols, rows)
@@ -182,6 +199,23 @@ async def export_tile_obj(idx: int):
         buf, media_type="text/plain",
         headers={"Content-Disposition": f"attachment; filename=tile_{idx:02d}.obj"},
     )
+
+
+@app.post("/api/tile/{idx}/regenerate")
+async def regenerate_tile(idx: int):
+    _check_ready(idx)
+    if idx in tile_manager.completed:
+        raise HTTPException(status_code=400, detail="Tile already carved — cannot regenerate")
+    await asyncio.to_thread(tile_manager.regenerate_tile, idx)
+    return state_response()
+
+
+@app.post("/api/regenerate-all")
+async def regenerate_all():
+    if not tile_manager.initialized:
+        raise HTTPException(status_code=400, detail="Not initialized — generate first")
+    await asyncio.to_thread(tile_manager.regenerate_all)
+    return state_response()
 
 
 @app.post("/api/reset")

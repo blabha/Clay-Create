@@ -34,6 +34,9 @@ export const api = {
   getSurface3d: (idx, res = 64) =>
     req(`/api/tile/${idx}/surface3d?res=${res}`),
 
+  regenerateTile: (idx) => req(`/api/tile/${idx}/regenerate`, { method: 'POST' }),
+  regenerateAll: () => req('/api/regenerate-all', { method: 'POST' }),
+
   reset: () => req('/api/reset', { method: 'POST' }),
 
   exportPngUrl: (idx) => `/api/export/png/${idx}`,

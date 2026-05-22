@@ -67,6 +67,14 @@ export default function App() {
     handleLoadSurface(idx)
   }
 
+  async function handleRegenerate(idx) {
+    await withLoading(() => api.regenerateTile(idx))
+  }
+
+  async function handleRegenerateAll() {
+    await withLoading(() => api.regenerateAll())
+  }
+
   async function handleLoadSurface(idx) {
     try {
       const data = await api.getSurface3d(idx)
@@ -93,6 +101,7 @@ export default function App() {
   const nTiles = appState.tiles.length
   const currentTile = appState.tiles[selectedTile] ?? null
   const allDone = appState.initialized && appState.completed.length === nTiles
+  const hasUncarved = appState.initialized && appState.completed.length < nTiles
 
   return (
     <div style={{ minHeight: '100vh', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -208,6 +217,20 @@ export default function App() {
                 )
               })}
             </div>
+
+            {hasUncarved && (
+              <div style={{ marginBottom: 8 }}>
+                <button
+                  className="primary"
+                  onClick={handleRegenerateAll}
+                  disabled={loading}
+                  style={{ width: '100%' }}
+                  title="Re-run harmonic interpolation for all uncarved tiles using scanned neighbours"
+                >
+                  {loading ? 'Regenerating…' : 'Regenerate Design'}
+                </button>
+              </div>
+            )}
 
             <TileWorkflow
               tile={currentTile}
