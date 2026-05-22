@@ -1,0 +1,23 @@
+# Captured point clouds and generated outputs (large files)
+*.ply
+*_color.png
+*_heightmap.png
+*_ortho_top.png
+*_ortho_front.png
+*_viewer.html
+roi_config.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
