@@ -8,7 +8,7 @@ MRAC01 Hardware III workshop at IAAC Barcelona. A co-creative fabrication system
 - Wall grid: user-defined, calculated as `floor(wall_dim_cm / 15)` — round down only
 - Units: centimetres throughout
 - MiDaS output is relative depth (not absolute mm); it maps to the full 3 cm carving range
-- The SD model (`v1-5-pruned-emaonly.safetensors`) is gitignored — users place it manually
+- No SD model — removed entirely. Depth comes from MiDaS + luminance detail only.
 
 ## Architecture
 ```
@@ -26,23 +26,44 @@ frontend (Vite/React :5173)  →  Vite proxy  →  backend (FastAPI :8001)
 ### Scan → adaptation loop
 After each tile is carved and scanned:
 1. Deviation = scanned − intended
-2. **Harmonic interpolation** regenerates all uncarved neighbours:
+2. **Harmonic interpolation** (`_harmonic_tile`) regenerates all uncarved neighbours automatically:
    - Collects actual scanned edge pixels from every completed neighbour
    - Gaussian-spreads those boundary values inward (σ = 0.35 × TILE_SIZE)
    - Distance-weighted blend: boundary-driven near edges, original design at centre
    - 50/50 final blend with original depth map
 3. Master heightmap updated: completed tiles show **actual scanned result**, pending tiles show updated intended design
 
+### Regenerate Design (manual)
+`_seam_corrected_tile` — used by `POST /api/regenerate-all`:
+- Computes `scanned_edge − original_edge` at every shared boundary with a completed neighbour
+- Spreads that additive correction ~26 px inward with exponential decay (`exp(-dist / 0.10×TILE_SIZE)`)
+- Adds the faded correction to the original design — interior is untouched, only seam region adjusts
+- Purpose: ensure contour lines are continuous across tile boundaries without changing the interior design
+
+### Regenerate Design vs harmonic interpolation
+| | `_harmonic_tile` | `_seam_corrected_tile` |
+|---|---|---|
+| Trigger | Automatic after each scan | Manual "Regenerate Design" button |
+| Effect | Smooth boundary continuation | Seam-only additive correction |
+| Interior | Blended with original | Untouched |
+
+### OBJ export dimensions
+150 mm × 150 mm × 30 mm, triangulated, 128² vertices.
+
 ### Key files
 | File | Role |
 |---|---|
 | `backend/main.py` | FastAPI endpoints, `enhance_heightmap`, `crop_to_grid` |
-| `backend/pipeline/tile_manager.py` | Tile state, harmonic interpolation, deviation propagation |
+| `backend/pipeline/tile_manager.py` | Tile state, harmonic interpolation, seam correction, deviation tracking, `original_intended` snapshot, `regen_diffs` |
 | `backend/pipeline/midas_processor.py` | MiDaS depth estimation (accepts target output size) |
-| `frontend/src/App.jsx` | Two-step flow: WallSetup → ImageUpload → tile workflow |
+| `backend/pipeline/exporter.py` | PNG + OBJ export (150×150×30 mm) |
+| `frontend/src/App.jsx` | Three-step flow: WallSetup → ImageUpload → tile workflow; carver name state |
+| `frontend/src/components/CarverModal.jsx` | Modal asking for carver name when an uncarved tile is selected |
 | `frontend/src/components/WallSetup.jsx` | Wall dimensions input, live grid preview |
 | `frontend/src/components/ImageUpload.jsx` | Drag-and-drop image upload |
-| `frontend/src/components/MasterView.jsx` | Dynamic grid overlay on master heightmap |
+| `frontend/src/components/MasterView.jsx` | Dynamic grid overlay; carver names shown on carved tiles |
+| `frontend/src/components/TileWorkflow.jsx` | Scan upload, deviation view, design adaptation diff, Regenerate Design button, 3D surface |
+| `frontend/src/components/DeviationView.jsx` | Intended / Scanned / Deviation comparison for carved tiles |
 
 ## Starting the servers
 Port 8000 is blocked on this machine — backend always runs on **8001**.
@@ -55,8 +76,21 @@ cd AI-generation/frontend && npm run dev
 ```
 `start.bat` handles both but uses `cmd /k` — prefer launching via Bash if start.bat doesn't open.
 
+## UI design
+- Color palette: warm clay tones — background `#FAF8F5`, accent terracotta `#B87050`, sage green `#6B9E70`
+- Font: DM Sans (Google Fonts, loaded in `index.html`)
+- No yellow anywhere — `--accent` is terracotta, `--green` is sage
+
+## Carver name feature
+- Clicking an uncarved tile triggers `CarverModal` (if no name assigned yet)
+- Name stored in `carverNames` state in `App.jsx` — `{ tileIdx: string }`
+- Name overlaid as a small badge on the tile in `MasterView` SVG (only for carved tiles)
+- `carverNames` is cleared on Reset
+
 ## Design decisions
-- **No Stable Diffusion** in current pipeline — removed to eliminate the 4 GB model dependency. Depth comes from MiDaS + image luminance detail.
-- **Harmonic interpolation** (not additive edge correction) for neighbour adaptation — additive corrections created visible stripe artifacts.
-- **50/50 blend** (original design : harmonically interpolated surface) — keeps aesthetic continuity with the reference image while guaranteeing seam-free boundaries.
+- **No Stable Diffusion** — removed to eliminate the 4 GB model dependency. `diffusers`, `transformers`, `tokenizers`, `accelerate` removed from `requirements.txt`.
+- **Harmonic interpolation** (not additive edge correction) for automatic neighbour adaptation — additive corrections created visible stripe artifacts.
+- **Seam correction** (not full-tile deviation propagation) for manual regeneration — deviation propagation changed too much of the interior design.
+- **50/50 blend** in `_harmonic_tile` — keeps aesthetic continuity with the reference image while guaranteeing seam-free boundaries.
 - `imageRendering: pixelated` on all heightmap `<img>` tags — prevents browser anti-aliasing from softening the depth data.
+- Paint Deviations (DrawingCanvas) removed — upload-only scan workflow.
