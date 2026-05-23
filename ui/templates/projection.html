@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<title>Clay Create — Projection</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+<style>
+:root {
+  --bg:      #e8e2d8;
+  --bg-card: #ddd7cb;
+  --bg-col:  #d4cec4;
+  --border:  #c5bfb3;
+  --bl:      #bbb5aa;
+  --gold:    #8B6914;
+  --gold-lt: #9a7a3a;
+  --gold-mu: #b0a070;
+  --done:    #cc6633;
+  --off:     #b0aa9e;
+  --f: 'DM Sans', sans-serif;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100vw; height:100vh; overflow:hidden; background:var(--bg); font-family:var(--f); color:var(--gold); }
+
+/* 706×578 virtual canvas scaled to viewport */
+.canvas {
+  width: 706px; height: 578px;
+  position: absolute;
+  top: 0; left: 0;
+  transform: scale(var(--s,1));
+  transform-origin: top left;
+}
+
+/* ── header row 1: y=0, h=32 ── */
+.hdr1 {
+  position:absolute; left:0; top:0; width:706px; height:32px;
+  background:var(--bg-col);
+  border-bottom: 0.5px solid var(--bl);
+  display:flex;
+}
+
+.hcol {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 10px; font-size:8px; font-weight:600; letter-spacing:.07em;
+  border-right:0.5px solid var(--bl); height:100%;
+}
+.hcol:last-child { border-right:none; }
+/* col widths: 277 | 224 | 205 */
+.hcol:nth-child(1) { width:277px; }
+.hcol:nth-child(2) { width:224px; }
+.hcol:nth-child(3) { width:205px; }
+.hr { display:flex; align-items:center; gap:5px; font-weight:400; font-size:7px; }
+.dot { width:7px; height:7px; border-radius:50%; }
+.dot-g { background:var(--gold); }
+.dot-r { background:#cc4400; }
+
+/* ── header row 2: y=32, h=14 ── */
+.hdr2 {
+  position:absolute; left:0; top:32px; width:706px; height:14px;
+  border-bottom:0.5px solid var(--bl);
+  display:flex;
+}
+.hdr2-c {
+  display:flex; align-items:center;
+  padding:0 10px; font-size:7.5px; color:var(--gold-lt);
+  border-right:0.5px solid var(--bl);
+}
+.hdr2-c:last-child { border-right:none; }
+.hdr2-c:nth-child(1) { width:277px; }
+.hdr2-c:nth-child(2) { width:224px; }
+.hdr2-c:nth-child(3) { width:205px; }
+
+/* ── footer: y=540, h=38 ── */
+.footer {
+  position:absolute; left:0; top:540px; width:706px; height:38px;
+  border-top:0.5px solid var(--bl);
+  display:flex;
+}
+.fcol {
+  display:flex; align-items:center;
+  padding:0 10px;
+  border-right:0.5px solid var(--bl);
+}
+.fcol:last-child { border-right:none; }
+.fcol:nth-child(1) { width:277px; }
+.fcol:nth-child(2) { width:224px; }
+.fcol:nth-child(3) { width:205px; }
+
+/* ── col dividers (content area y=46..540) ── */
+.div1 { position:absolute; left:277px; top:46px; width:0.5px; height:494px; background:var(--bl); }
+.div2 { position:absolute; left:501px; top:46px; width:0.5px; height:494px; background:var(--bl); }
+
+/* ── COL 01 content ── */
+/* active card: x=8, y=52, w=261, h=110 */
+.active-card {
+  position:absolute; left:8px; top:52px; width:261px;
+  background:var(--bg-card); border:0.5px solid var(--border); border-radius:3px;
+  padding:8px 12px;
+}
+.bar { width:28px; height:2px; background:var(--gold); margin-bottom:6px; }
+.participant { font-size:9px; color:var(--gold-lt); min-height:11px; margin-bottom:1px; }
+.timer { font-size:32px; font-weight:700; letter-spacing:.04em; line-height:1; }
+.tlbl { font-size:7px; color:var(--gold-lt); margin-top:3px; margin-bottom:6px; }
+.prow { display:flex; align-items:baseline; justify-content:space-between; }
+.pv   { font-size:13px; font-weight:700; }
+.pl   { font-size:7px; color:var(--gold-lt); margin-left:3px; }
+.bc   { font-size:7px; color:var(--gold-lt); }
+
+/* grid label: below active card */
+.grid-lbl { position:absolute; left:8px; top:170px; font-size:7px; color:var(--gold-lt); }
+
+/* block grid: 150×150, bottom=141.9 from base (578)
+   content area bottom = 540. grid bottom from content bottom = 141.9-(578-540)=103.9
+   grid top = 540 - 103.9 - 150 = 286.1
+   grid centered in col01 (0..277): x=(277-150)/2=63.5 */
+.block-grid {
+  position:absolute;
+  left:63px; top:286px;
+  width:150px; height:150px;
+  display:grid; gap:3px;
+}
+.bcell {
+  background:var(--bg-col); border:0.5px solid var(--border); border-radius:2px;
+  display:flex; align-items:center; justify-content:center; font-size:11px;
+  transition: background .3s, color .3s;
+}
+.bcell.done      { background:var(--bg-card); color:var(--gold); }
+.bcell.sculpting { background:var(--gold);    color:var(--bg); }
+.bcell.available { color:var(--gold-mu); }
+.bcell.pending   { color:var(--off); }
+
+/* ── COL 02: blueprint box 150×150
+   top=286, centered in col02 (277..501=224px wide): x=277+(224-150)/2=314 ── */
+.bp-box {
+  position:absolute; left:314px; top:286px; width:150px; height:150px;
+  border:0.5px solid var(--border); border-radius:2px; overflow:hidden;
+  background:var(--bg-col);
+}
+.bp-box img { width:100%; height:100%; object-fit:cover; display:block; }
+.bp-no { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:8px; color:var(--off); }
+
+/* ── COL 03: work area box 150×150
+   top=286, centered in col03 (501..706=205px wide): x=501+(205-150)/2=528 ── */
+.wa-box {
+  position:absolute; left:528px; top:286px; width:150px; height:150px;
+  border:0.5px solid var(--border); border-radius:2px;
+  background:var(--bg-col);
+}
+
+/* ── footer col01: legend ── */
+.legend { display:flex; align-items:center; gap:10px; }
+.li { display:flex; align-items:center; gap:4px; font-size:7px; white-space:nowrap; }
+.ld { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.ld-s { background:var(--gold); }
+.ld-d { background:var(--done); }
+.ld-a { border:1px solid var(--gold); }
+.ld-p { border:1px solid var(--bl); }
+
+/* footer col02: grid info */
+.ginfo { display:flex; gap:14px; }
+.gi { display:flex; flex-direction:column; gap:1px; }
+.gi-l { font-size:7px; color:var(--gold-lt); }
+.gi-v { font-size:8px; font-weight:600; }
+
+/* footer col03: depth legend */
+.depth-legend { display:flex; flex-direction:column; gap:3px; width:100%; }
+.depth-bar { height:10px; border-radius:2px;
+  background: linear-gradient(to right, #008000, #aacc00, #ffff00, #ffaa00, #ff4400, #cc0000);
+}
+.depth-labels { display:flex; justify-content:space-between; font-size:6px; color:var(--gold-lt); }
+.depth-title { font-size:7px; color:var(--gold-lt); }
+</style>
+</head>
+<body>
+<div class="canvas" id="canvas">
+
+  <!-- header 1 -->
+  <div class="hdr1">
+    <div class="hcol">
+      <span>01&nbsp;&nbsp;GRID STATUS</span>
+      <div class="hr"><div class="dot dot-g"></div>LIVE</div>
+    </div>
+    <div class="hcol">
+      <span>02&nbsp;&nbsp;BLUEPRINT</span>
+      <div class="hr"><span id="sess-clk">00:00:00</span></div>
+    </div>
+    <div class="hcol">
+      <span>03&nbsp;&nbsp;WORK AREA</span>
+      <div class="hr"><div class="dot dot-r"></div><span id="blk-hdr">00:00</span></div>
+    </div>
+  </div>
+
+  <!-- header 2 -->
+  <div class="hdr2">
+    <div class="hdr2-c">ACTIVE BLOCK</div>
+    <div class="hdr2-c"></div>
+    <div class="hdr2-c"></div>
+  </div>
+
+  <!-- col dividers -->
+  <div class="div1"></div>
+  <div class="div2"></div>
+
+  <!-- col01: active card -->
+  <div class="active-card">
+    <div class="bar"></div>
+    <div class="participant" id="participant">—</div>
+    <div class="timer" id="timer">00:00</div>
+    <div class="tlbl">ELAPSED</div>
+    <div class="prow">
+      <div><span class="pv" id="pct">0%</span><span class="pl">COMPLETED</span></div>
+      <span class="bc" id="blk-ct">0 / 0</span>
+    </div>
+  </div>
+
+  <!-- col01: grid label -->
+  <div class="grid-lbl" id="grid-lbl">BLOCK GRID — 0 × 0</div>
+
+  <!-- col01: block grid -->
+  <div class="block-grid" id="block-grid"></div>
+
+  <!-- col02: blueprint -->
+  <div class="bp-box">
+    <img src="/static/heightmap.png" alt="heightmap"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+    <div class="bp-no" style="display:none">NO IMAGE</div>
+  </div>
+
+  <!-- col03: work area -->
+  <div class="wa-box">
+    <img src="/static/progress.png" alt="progress"
+         onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:2px;"/>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <div class="fcol">
+      <div class="legend">
+        <div class="li"><div class="ld ld-s"></div>SCULPTING</div>
+        <div class="li"><div class="ld ld-d"></div>DONE</div>
+        <div class="li"><div class="ld ld-a"></div>AVAILABLE</div>
+        <div class="li"><div class="ld ld-p"></div>PENDING</div>
+      </div>
+    </div>
+    <div class="fcol">
+      <div class="ginfo">
+        <div class="gi"><span class="gi-l">Grid</span><span class="gi-v" id="i-grid">3 × 3</span></div>
+        <div class="gi"><span class="gi-l">Tile</span><span class="gi-v" id="i-tile">150 mm</span></div>
+        <div class="gi"><span class="gi-l">Depth</span><span class="gi-v" id="i-depth">30 mm</span></div>
+      </div>
+    </div>
+    <div class="fcol">
+      <div class="depth-legend">
+        <div class="depth-title">DEPTH LEGEND</div>
+        <div class="depth-bar"></div>
+        <div class="depth-labels"><span>DEEP</span><span>SHALLOW</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+  // scale 706×610 canvas to fit viewport
+  function scale() {
+    const sx = window.innerWidth  / 706;
+    const sy = window.innerHeight / 578;
+    const s  = Math.min(sx, sy);
+    const c  = document.getElementById('canvas');
+    c.style.setProperty('--s', s);
+    c.style.left = ((window.innerWidth  - 706 * s) / 2) + 'px';
+    c.style.top  = ((window.innerHeight - 578 * s) / 2) + 'px';
+  }
+  scale(); window.addEventListener('resize', scale);
+
+  const socket = io();
+  let blockElapsed = 0, sessionElapsed = 0;
+  let blockRunning = false;
+
+  socket.on('state_sync',      applyState);
+  socket.on('block_assigned',  applyState);
+  socket.on('block_completed', applyState);
+  socket.on('session_reset',   applyState);
+  socket.on('tick', d => {
+    if (!d) return;
+    if (typeof d.block_elapsed  !== 'undefined') blockElapsed   = d.block_elapsed;
+    if (typeof d.session_time   !== 'undefined') sessionElapsed = d.session_time;
+    document.getElementById('timer').textContent    = fmt(blockElapsed);
+    document.getElementById('blk-hdr').textContent  = fmt(blockElapsed);
+    document.getElementById('sess-clk').textContent = fmtH(sessionElapsed);
+  });
+
+  function applyState(s) {
+    if (!s) return;
+    const blocks = s.blocks || [];
+    const total  = blocks.length || 9;
+    const cols   = s.cols || 3;
+    const rows   = s.rows || 3;
+    const done   = blocks.filter(b => (b.status||b) === 'done').length;
+    const active = blocks.find(b => { const st=b.status||b; return st==='sculpting'||st==='active'; });
+
+    document.getElementById('participant').textContent =
+      (active && active.sculptor) ? active.sculptor : (s.active_participant || '—');
+
+    if (!active) { blockElapsed = 0; document.getElementById('timer').textContent = fmt(0); document.getElementById('blk-hdr').textContent = fmt(0); }
+
+    const pct = total > 0 ? Math.round(done/total*100) : 0;
+    document.getElementById('pct').textContent        = pct + '%';
+    document.getElementById('blk-ct').textContent     = done + ' / ' + total;
+
+    document.getElementById('grid-lbl').textContent   = `BLOCK GRID — ${cols} × ${rows}`;
+    document.getElementById('i-grid').textContent     = `${cols} × ${rows}`;
+    if (s.tile_mm)  document.getElementById('i-tile').textContent  = s.tile_mm  + ' mm';
+    if (s.depth_mm) document.getElementById('i-depth').textContent = s.depth_mm + ' mm';
+
+    const grid = document.getElementById('block-grid');
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.innerHTML = '';
+    blocks.forEach((b, i) => {
+      const st = b.status || b;
+      const c  = document.createElement('div');
+      c.className = 'bcell ' + (st==='done'?'done':st==='sculpting'||st==='active'?'sculpting':st==='available'?'available':'pending');
+      c.textContent = (st==='done'||st==='sculpting'||st==='active') ? '✓' : (i+1);
+      grid.appendChild(c);
+    });
+  }
+
+  function fmt(s)  { return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+  function fmtH(s) { return String(Math.floor(s/3600)).padStart(2,'0')+':'+fmt(s%3600); }
+
+  socket.emit('request_state');
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clay Create — Operator Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 <script>
 var state = {};
@@ -15,64 +16,61 @@ var ui = { cols: 3, rows: 3, participants: 4 };
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #0f1117;
-  --surface: #1c1e26;
-  --surface2: #252830;
-  --border: rgba(255,255,255,0.07);
-  --border-md: rgba(255,255,255,0.14);
-  --text: #e8eaf0;
-  --muted: #8b8fa8;
-  --hint: #555870;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --green: #1d9e75;
-  --green-bg: #0a2a1f;
-  --green-bd: #0f6e56;
-  --green-text: #5dcaa5;
-  --amber-bg: #2a1f0a;
-  --amber-bd: #854f0b;
-  --amber-text: #fac775;
-  --blue-bg: #0a1a2a;
-  --blue-bd: #185fa5;
-  --blue-text: #85b7eb;
-  --red-bg: #2a0f0f;
-  --red-bd: #a32d2d;
-  --red-text: #f09595;
+  --bg:         #FDFAF7;
+  --surface:    #FFFFFF;
+  --surface2:   #F5EDE3;
+  --border:     #EDE0D0;
+  --border-md:  #D4B89A;
+  --text:       #2C1810;
+  --muted:      #8B6F5E;
+  --hint:       #B08060;
+  --radius:     8px;
+  --radius-lg:  12px;
+  --clay:       #A67C5B;
+  --clay-dark:  #7A4520;
+  --clay-light: #F0E8DC;
+  --clay-bg:    #FBF0E6;
+  --sand:       #D4C4B0;
+  --sand-dark:  #4A2C1A;
+  --amber-bd:   #C4956A;
+  --red-text:   #8B3A2A;
+  --red-bd:     #C4956A;
+  --red-bg:     #FBF0E6;
 }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
 .app { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
 
 /* HEADER */
 .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
 .logo { display: flex; align-items: center; gap: 10px; }
-.logo-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--green-bg); border: 1px solid var(--green-bd); display: flex; align-items: center; justify-content: center; }
-.logo-text { font-size: 15px; font-weight: 600; color: var(--text); }
-.logo-sub { font-size: 11px; color: var(--muted); }
+.logo-mark { width: 32px; height: 32px; border-radius: var(--radius); background: var(--sand-dark); border: 1px solid var(--clay); display: flex; align-items: center; justify-content: center; }
+.logo-text { font-size: 15px; font-weight: 500; color: var(--text); letter-spacing: 0.01em; }
+.logo-sub  { font-size: 11px; color: var(--muted); }
 .hdr-right { display: flex; align-items: center; gap: 10px; }
 .status-pill { font-size: 11px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border-md); color: var(--muted); background: var(--surface); }
-.status-pill.active { background: var(--green-bg); color: var(--green-text); border-color: var(--green-bd); }
+.status-pill.active { background: var(--clay-bg); color: var(--clay-dark); border-color: var(--amber-bd); }
 
 /* METRICS */
 .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.5rem; }
-.metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.875rem 1rem; }
-.metric-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
-.metric-value { font-size: 24px; font-weight: 600; color: var(--text); }
-.metric-sub { font-size: 11px; color: var(--hint); margin-top: 2px; }
+.metric { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .875rem 1rem; }
+.metric-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .06em; font-weight: 400; }
+.metric-value { font-size: 24px; font-weight: 500; color: var(--text); }
+.metric-sub   { font-size: 11px; color: var(--hint); margin-top: 2px; }
 
 /* SETUP */
 .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1.5rem; }
-.section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin-bottom: 10px; }
+.section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 500; margin-bottom: 10px; }
 .setup-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
 .field-group { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.field-label { font-size: 11px; color: var(--muted); }
 .number-input { display: flex; align-items: center; gap: 8px; }
-.num-btn { width: 28px; height: 28px; border-radius: var(--radius); border: 1px solid var(--border-md); background: var(--surface2); color: var(--text); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
-.num-btn:hover { background: var(--border-md); border-color: var(--green-bd); }
-.num-val { font-size: 20px; font-weight: 600; min-width: 28px; text-align: center; color: var(--text); }
+.num-btn { width: 28px; height: 28px; border-radius: var(--radius); border: 1px solid var(--border-md); background: var(--bg); color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.num-btn:hover { background: var(--clay-light); border-color: var(--clay); }
+.num-val { font-size: 20px; font-weight: 500; min-width: 28px; text-align: center; color: var(--text); }
 .divider-v { width: 1px; height: 48px; background: var(--border); }
 .alert { display: none; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius); font-size: 13px; margin-top: 12px; border: 1px solid; }
-.alert.warn { background: var(--amber-bg); color: var(--amber-text); border-color: var(--amber-bd); }
-.alert.ok { background: var(--green-bg); color: var(--green-text); border-color: var(--green-bd); }
+.alert.warn { background: var(--clay-bg); color: var(--clay-dark); border-color: var(--amber-bd); }
+.alert.ok   { background: var(--clay-light); color: var(--sand-dark); border-color: var(--border-md); }
 
 /* LAYOUT */
 .main { display: grid; grid-template-columns: 1fr 280px; gap: 1.5rem; }
@@ -80,100 +78,96 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* GRID */
 .block-grid { display: grid; gap: 8px; margin-bottom: 1rem; }
-.block { border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 62px; aspect-ratio: 1; position: relative; transition: all 0.15s; user-select: none; }
-.block-done     { background: #161a12; border: 1px solid #252e1a; opacity: 0.7; cursor: default; }
-.block-sculpting{ background: var(--green-bg); border: 2px solid var(--green-bd); cursor: default; }
-.block-available{ background: var(--surface2); border: 1.5px dashed #3a4060; cursor: pointer; }
-.block-available:hover { background: var(--surface); border-color: var(--green-bd); }
-.block-selected { background: var(--blue-bg); border: 2px solid var(--blue-bd); cursor: pointer; }
-.block-pending  { background: #13141b; border: 1px solid var(--border); cursor: not-allowed; }
-.block-num  { font-size: 11px; font-weight: 600; color: var(--muted); }
-.block-name { font-size: 10px; text-align: center; padding: 0 4px; margin-top: 1px; color: var(--hint); }
-.block-sub  { font-size: 9px; text-align: center; color: var(--hint); }
-.check-mark { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
+.block { border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 62px; aspect-ratio: 1; position: relative; transition: all .15s; user-select: none; }
+.block-done      { background: var(--sand); border: 1px solid #C4A882; opacity: .8; cursor: default; }
+.block-sculpting { background: var(--clay); border: 2px solid var(--clay-dark); cursor: default; }
+.block-available { background: var(--surface); border: 1.5px dashed var(--amber-bd); cursor: pointer; }
+.block-available:hover { background: var(--clay-bg); border-color: var(--clay); }
+.block-selected  { background: var(--clay-bg); border: 2px solid var(--clay-dark); cursor: pointer; }
+.block-pending   { background: var(--clay-light); border: 1px solid var(--border); cursor: not-allowed; }
+.block-num  { font-size: 11px; font-weight: 500; color: var(--sand-dark); }
+.block-name { font-size: 10px; text-align: center; padding: 0 4px; margin-top: 1px; color: var(--clay-dark); }
+.block-sub  { font-size: 9px; text-align: center; color: var(--muted); }
+.check-mark { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--sand-dark); display: flex; align-items: center; justify-content: center; }
 .check-mark svg { width: 8px; height: 8px; }
 .grid-legend { display: flex; gap: 14px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
-.legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+.legend-dot  { width: 10px; height: 10px; border-radius: 3px; }
 
 /* SIDEBAR */
 .sidebar { display: flex; flex-direction: column; gap: 1rem; }
-.current-block-card { background: var(--green-bg); border: 1px solid var(--green-bd); border-radius: var(--radius-lg); padding: 1.25rem; }
-.cb-label { font-size: 11px; color: var(--green-text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.cb-name  { font-size: 20px; font-weight: 600; color: #9fe1cb; margin-top: 2px; }
-.cb-sub   { font-size: 12px; color: var(--green-text); }
-.timer    { font-size: 30px; font-weight: 700; color: #9fe1cb; margin: 10px 0 2px; font-variant-numeric: tabular-nums; }
-.timer-lbl{ font-size: 11px; color: var(--green-text); }
+.current-block-card { background: var(--clay-light); border: 1px solid var(--amber-bd); border-radius: var(--radius-lg); padding: 1.25rem; }
+.cb-label { font-size: 11px; color: var(--clay-dark); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+.cb-name  { font-size: 20px; font-weight: 500; color: var(--text); margin-top: 2px; }
+.cb-sub   { font-size: 12px; color: var(--clay-dark); }
+.timer    { font-size: 30px; font-weight: 300; color: var(--text); margin: 10px 0 2px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.timer-lbl{ font-size: 11px; color: var(--muted); }
 .next-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
-.fallback-notice { background: var(--amber-bg); border: 1px solid var(--amber-bd); border-radius: var(--radius); padding: 7px 10px; font-size: 12px; color: var(--amber-text); margin-bottom: 10px; display: none; }
-.reuse-notice    { background: var(--blue-bg);  border: 1px solid var(--blue-bd);  border-radius: var(--radius); padding: 7px 10px; font-size: 12px; color: var(--blue-text);  margin-bottom: 10px; }
-.sel-badge       { background: var(--blue-bg);  border: 1px solid var(--blue-bd);  border-radius: var(--radius); padding: 5px 10px; font-size: 12px; color: var(--blue-text);  display: none; margin: 6px 0; }
+.fallback-notice { background: var(--clay-bg); border: 1px solid var(--amber-bd); border-radius: var(--radius); padding: 7px 10px; font-size: 12px; color: var(--clay-dark); margin-bottom: 10px; display: none; }
+.reuse-notice    { background: var(--clay-light); border: 1px solid var(--border-md); border-radius: var(--radius); padding: 7px 10px; font-size: 12px; color: var(--sand-dark); margin-bottom: 10px; }
+.sel-badge       { background: var(--clay-bg); border: 1px solid var(--amber-bd); border-radius: var(--radius); padding: 5px 10px; font-size: 12px; color: var(--clay-dark); display: none; margin: 6px 0; }
 .sel-hint { font-size: 12px; color: var(--muted); margin: 8px 0; }
-.edge-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.edge-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--clay-light); font-size: 12px; }
 .edge-row:last-child { border-bottom: none; }
 .edge-badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; border: 1px solid; }
-.edge-free { background: var(--surface2); color: var(--muted); border-color: var(--border-md); }
-.edge-cond { background: var(--amber-bg); color: var(--amber-text); border-color: var(--amber-bd); }
-.part-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.edge-free { background: var(--clay-light); color: var(--muted); border-color: var(--border); }
+.edge-cond { background: var(--clay-bg); color: var(--clay-dark); border-color: var(--amber-bd); }
+.part-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--clay-light); }
 .part-row:last-child { border-bottom: none; }
-.avatar   { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
-.av-done  { background: var(--green-bg); color: var(--green-text); }
-.av-active{ background: #0f3028; color: #9fe1cb; }
-.part-badge  { font-size: 10px; padding: 2px 7px; border-radius: 99px; }
-.pb-done  { background: var(--green-bg); color: var(--green-text); }
-.pb-sculpt{ background: var(--green-bg); color: #9fe1cb; border: 1px solid var(--green-bd); }
-.hist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.avatar   { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; flex-shrink: 0; }
+.av-done  { background: var(--sand); color: var(--sand-dark); }
+.av-active{ background: var(--clay); color: var(--bg); }
+.part-badge  { font-size: 10px; padding: 2px 8px; border-radius: 99px; }
+.pb-done  { background: var(--clay-light); color: var(--sand-dark); }
+.pb-sculpt{ background: var(--clay); color: var(--bg); }
+.hist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--clay-light); font-size: 12px; }
 .hist-row:last-child { border-bottom: none; }
-.hist-num { width: 22px; height: 22px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--border-md); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
+.hist-num { width: 22px; height: 22px; border-radius: 4px; background: var(--clay-light); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: var(--muted); flex-shrink: 0; }
 .empty { text-align: center; padding: 1.5rem; color: var(--hint); font-size: 13px; }
 
-/* BUTTONS — all fully explicit, no inheritance issues */
-.btn-primary   { width: 100%; padding: 9px 16px; background: var(--green); color: #ffffff; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+/* BUTTONS */
+.btn-primary   { width: 100%; padding: 9px 16px; background: var(--sand-dark); color: var(--bg); border: none; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity .15s; }
 .btn-primary:hover { opacity: 0.85; }
-.btn-secondary { width: 100%; padding: 8px 16px; background: var(--surface2); color: var(--text); border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; cursor: pointer; font-family: inherit; transition: background .15s; }
-.btn-secondary:hover { background: var(--border-md); }
-.btn-danger    { width: 100%; padding: 8px 16px; background: transparent; color: var(--red-text); border: 1px solid var(--red-bd); border-radius: var(--radius); font-size: 13px; cursor: pointer; font-family: inherit; transition: background .15s; }
+.btn-secondary { width: 100%; padding: 8px 16px; background: transparent; color: var(--text); border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.btn-secondary:hover { background: var(--clay-light); }
+.btn-danger    { width: 100%; padding: 8px 16px; background: transparent; color: var(--red-text); border: 1px solid var(--red-bd); border-radius: var(--radius); font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .btn-danger:hover { background: var(--red-bg); }
 .btn-sm        { width: auto; padding: 5px 14px; font-size: 12px; }
 
 /* INPUTS */
 input[type="text"], select {
   width: 100%; padding: 8px 10px; border: 1px solid var(--border-md);
-  border-radius: var(--radius); font-size: 13px; font-family: inherit;
-  color: var(--text); background: var(--surface2); outline: none;
+  border-radius: var(--radius); font-size: 13px; font-family: 'DM Sans', sans-serif;
+  color: var(--text); background: var(--bg); outline: none;
 }
-input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
+input[type="text"]:focus, select:focus { border-color: var(--clay); }
 
 /* MODALS */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 100; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(44,24,16,.35); align-items: center; justify-content: center; z-index: 100; }
 .modal-overlay.open { display: flex; }
 .modal { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border-md); padding: 1.5rem; width: 320px; }
-.modal-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.modal-title { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
 .modal-sub   { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
-.modal-input-wrap { margin-bottom: 0; }
 .modal-actions { display: flex; gap: 8px; margin-top: 12px; }
-.modal-actions .btn-primary,
-.modal-actions .btn-secondary,
-.modal-actions .btn-danger { flex: 1; }
+.modal-actions .btn-primary, .modal-actions .btn-secondary, .modal-actions .btn-danger { flex: 1; }
 
 /* UTILS */
-.gap-6  { display: flex; flex-direction: column; gap: 6px; }
-.mt-8   { margin-top: 8px; }
-.mt-10  { margin-top: 10px; }
+.gap-6 { display: flex; flex-direction: column; gap: 6px; }
+.mt-8  { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- HEADER -->
   <div class="header">
     <div class="logo">
       <div class="logo-mark">
         <svg viewBox="0 0 26 26" fill="none" width="20" height="20">
-          <path d="M5 20 L13 6 L21 20 Z" fill="#0f6e56" stroke="#1d9e75" stroke-width="1"/>
-          <path d="M8 20 L13 11 L18 20 Z" fill="#1d9e75"/>
-          <line x1="5" y1="16" x2="21" y2="16" stroke="#5dcaa5" stroke-width="1" stroke-dasharray="2 2"/>
-          <line x1="7" y1="20" x2="19" y2="20" stroke="#5dcaa5" stroke-width="1.2"/>
+          <path d="M5 20 L13 6 L21 20 Z" fill="#4A2C1A" stroke="#A67C5B" stroke-width="1"/>
+          <path d="M8 20 L13 11 L18 20 Z" fill="#A67C5B"/>
+          <line x1="5" y1="16" x2="21" y2="16" stroke="#C4956A" stroke-width="1" stroke-dasharray="2 2"/>
+          <line x1="7" y1="20" x2="19" y2="20" stroke="#C4956A" stroke-width="1.2"/>
         </svg>
       </div>
       <div>
@@ -187,7 +181,6 @@ input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
     </div>
   </div>
 
-  <!-- METRICS -->
   <div class="metrics">
     <div class="metric"><div class="metric-label">Participants</div><div class="metric-value" id="m-p">—</div><div class="metric-sub">registered</div></div>
     <div class="metric"><div class="metric-label">Blocks total</div><div class="metric-value" id="m-b">—</div><div class="metric-sub" id="m-gs">grid not set</div></div>
@@ -195,62 +188,35 @@ input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
     <div class="metric"><div class="metric-label">Progress</div><div class="metric-value" id="m-pr">—</div><div class="metric-sub">of total</div></div>
   </div>
 
-  <!-- SETUP -->
   <div class="setup-card" id="setup-card">
     <p class="section-label">Session setup</p>
     <div class="setup-row">
-      <div class="field-group">
-        <div class="field-label">Columns</div>
-        <div class="number-input">
-          <button class="num-btn" onclick="adjustGrid('cols',-1)">−</button>
-          <span class="num-val" id="cols-val">3</span>
-          <button class="num-btn" onclick="adjustGrid('cols',1)">+</button>
-        </div>
-      </div>
+      <div class="field-group"><div class="field-label">Columns</div><div class="number-input"><button class="num-btn" onclick="adjustGrid('cols',-1)">−</button><span class="num-val" id="cols-val">3</span><button class="num-btn" onclick="adjustGrid('cols',1)">+</button></div></div>
       <div class="divider-v"></div>
-      <div class="field-group">
-        <div class="field-label">Rows</div>
-        <div class="number-input">
-          <button class="num-btn" onclick="adjustGrid('rows',-1)">−</button>
-          <span class="num-val" id="rows-val">3</span>
-          <button class="num-btn" onclick="adjustGrid('rows',1)">+</button>
-        </div>
-      </div>
+      <div class="field-group"><div class="field-label">Rows</div><div class="number-input"><button class="num-btn" onclick="adjustGrid('rows',-1)">−</button><span class="num-val" id="rows-val">3</span><button class="num-btn" onclick="adjustGrid('rows',1)">+</button></div></div>
       <div class="divider-v"></div>
-      <div class="field-group">
-        <div class="field-label">Participants</div>
-        <div class="number-input">
-          <button class="num-btn" onclick="adjustParts(-1)">−</button>
-          <span class="num-val" id="parts-val">4</span>
-          <button class="num-btn" onclick="adjustParts(1)">+</button>
-        </div>
-      </div>
+      <div class="field-group"><div class="field-label">Participants</div><div class="number-input"><button class="num-btn" onclick="adjustParts(-1)">−</button><span class="num-val" id="parts-val">4</span><button class="num-btn" onclick="adjustParts(1)">+</button></div></div>
       <div class="divider-v"></div>
       <button class="btn-primary" style="width:auto;padding:9px 24px;" onclick="startSession()">Start session</button>
     </div>
     <div class="alert" id="grid-alert"></div>
   </div>
 
-  <!-- MAIN GRID + SIDEBAR -->
   <div class="main">
     <div>
       <p class="section-label">Block grid</p>
       <div class="side-card">
-        <div class="block-grid" id="block-grid">
-          <div class="empty">Set up a session to see the grid</div>
-        </div>
+        <div class="block-grid" id="block-grid"><div class="empty">Set up a session to see the grid</div></div>
         <div class="grid-legend">
-          <div class="legend-item"><div class="legend-dot" style="background:var(--green-bg);border:1.5px solid var(--green-bd);"></div>Sculpting</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#161a12;border:1px solid #252e1a;"></div>Done</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--surface2);border:1.5px dashed #3a4060;"></div>Available</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#13141b;border:1px solid var(--border);"></div>Locked</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--clay);border:1.5px solid var(--clay-dark);"></div>Sculpting</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--sand);border:1px solid #C4A882;"></div>Done</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--surface);border:1.5px dashed var(--amber-bd);"></div>Available</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--clay-light);border:1px solid var(--border);"></div>Locked</div>
         </div>
       </div>
     </div>
 
     <div class="sidebar">
-
-      <!-- ACTIVE BLOCK -->
       <div id="current-block-area" style="display:none;">
         <p class="section-label">Now sculpting</p>
         <div class="current-block-card">
@@ -270,7 +236,6 @@ input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
         </div>
       </div>
 
-      <!-- NEXT PARTICIPANT -->
       <div id="next-block-area" style="display:none;">
         <p class="section-label">Next participant</p>
         <div class="next-card">
@@ -290,34 +255,23 @@ input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
         </div>
       </div>
 
-      <!-- PARTICIPANTS -->
       <div>
         <p class="section-label">Participants</p>
-        <div class="side-card">
-          <div id="participant-list"><div class="empty">Session not started</div></div>
-        </div>
+        <div class="side-card"><div id="participant-list"><div class="empty">Session not started</div></div></div>
       </div>
-
-      <!-- HISTORY -->
       <div>
         <p class="section-label">History</p>
-        <div class="side-card">
-          <div id="history-list"><div class="empty">No blocks completed yet</div></div>
-        </div>
+        <div class="side-card"><div id="history-list"><div class="empty">No blocks completed yet</div></div></div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- MODAL: FIRST PARTICIPANT -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <div class="modal-title" id="modal-title">Name the first participant</div>
     <div class="modal-sub"   id="modal-sub">Block 1 sets the edge pattern for the whole wall.</div>
-    <div class="modal-input-wrap">
-      <input type="text" id="modal-input" placeholder="Participant name..." />
-    </div>
+    <input type="text" id="modal-input" placeholder="Participant name..." />
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn-primary"   onclick="confirmModal()">Confirm</button>
@@ -325,7 +279,6 @@ input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
   </div>
 </div>
 
-<!-- MODAL: RESET CONFIRM -->
 <div class="modal-overlay" id="reset-overlay">
   <div class="modal" style="border-top:2px solid var(--red-bd);">
     <div class="modal-title" style="color:var(--red-text);">Reset session?</div>
@@ -340,7 +293,6 @@ input[type="text"]:focus, select:focus { border-color: var(--green-bd); }
 <script>
 const socket = io();
 
-// ── SOCKET ────────────────────────────────────────────────────────────────────
 socket.on('connect',           ()   => console.log('[WS] Connected'));
 socket.on('state_sync',        data => applyState(data));
 socket.on('session_started',   data => { applyState(data); showGrid(); });
@@ -360,7 +312,6 @@ function applyState(s) {
   renderHistory();
 }
 
-// ── SETUP ─────────────────────────────────────────────────────────────────────
 function adjustGrid(dim, delta) {
   if (state.started) return;
   if (dim === 'cols') ui.cols = Math.max(1, Math.min(8, ui.cols + delta));
@@ -380,9 +331,9 @@ function adjustParts(delta) {
 }
 
 function validateGrid() {
-  const total = ui.cols * ui.rows;
-  const diff  = total - ui.participants;
-  const el    = document.getElementById('grid-alert');
+  var total = ui.cols * ui.rows;
+  var diff  = total - ui.participants;
+  var el    = document.getElementById('grid-alert');
   if (diff > 0) {
     el.style.display = 'flex'; el.className = 'alert warn';
     el.textContent = diff + ' block' + (diff > 1 ? 's' : '') + ' unassigned — participants will sculpt more than one block.';
@@ -394,8 +345,7 @@ function validateGrid() {
 
 function startSession() {
   fetch('/api/session/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cols: ui.cols, rows: ui.rows, participants: ui.participants })
   });
 }
@@ -408,7 +358,6 @@ function showGrid() {
   openModal('Name the first participant', 'Block 1 sets the edge pattern for the whole wall.');
 }
 
-// ── MODALS ────────────────────────────────────────────────────────────────────
 function openModal(t, s) {
   document.getElementById('modal-title').textContent = t;
   document.getElementById('modal-sub').textContent   = s;
@@ -421,19 +370,16 @@ function askReset()    { document.getElementById('reset-overlay').classList.add(
 function closeReset()  { document.getElementById('reset-overlay').classList.remove('open'); }
 function confirmModal() {
   var name = document.getElementById('modal-input').value.trim() || 'Participant 1';
-  closeModal();
-  doAssign(0, name);
+  closeModal(); doAssign(0, name);
 }
 function confirmReset() {
   closeReset();
   fetch('/api/session/reset', { method: 'POST' });
 }
 
-// ── BLOCK ACTIONS ─────────────────────────────────────────────────────────────
 function doAssign(blockIdx, name) {
   fetch('/api/block/assign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ block_index: blockIdx, name: name })
   }).then(function(r) { return r.json(); }).then(function(res) {
     if (!res.success) { alert(res.error); }
@@ -457,8 +403,7 @@ function assignBlock() {
 function markDone() {
   if (state.active_block === null || state.active_block === undefined) return;
   fetch('/api/block/complete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ block_index: state.active_block })
   }).then(function() { stopTimer(); });
 }
@@ -466,8 +411,7 @@ function markDone() {
 function resetBlock() {
   if (state.active_block === null || state.active_block === undefined) return;
   fetch('/api/block/reset', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ block_index: state.active_block })
   }).then(function() { stopTimer(); });
 }
@@ -483,7 +427,6 @@ function clickBlock(idx) {
   renderGrid();
 }
 
-// ── TIMER ─────────────────────────────────────────────────────────────────────
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(function() {
@@ -496,7 +439,6 @@ function startTimer() {
 function stopTimer() { clearInterval(timerInterval); timerStart = null; }
 function pad(n) { return String(n).padStart(2, '0'); }
 
-// ── RENDER ────────────────────────────────────────────────────────────────────
 function renderMetrics() {
   if (!state.started) return;
   document.getElementById('m-p').textContent  = state.participants;
@@ -514,17 +456,17 @@ function renderGrid() {
     var cls = 'block ', inner = '';
     if (b.status === 'done') {
       cls += 'block-done';
-      inner = '<div class="check-mark"><svg viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#fff" stroke-width="1.5" fill="none"/></svg></div>'
-            + '<span class="block-num" style="color:#555870">' + (i+1) + '</span>'
+      inner = '<div class="check-mark"><svg viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#FDFAF7" stroke-width="1.5" fill="none"/></svg></div>'
+            + '<span class="block-num" style="color:var(--sand-dark)">' + (i+1) + '</span>'
             + '<span class="block-name">' + (b.sculptor || '') + '</span>';
     } else if (b.status === 'sculpting') {
       cls += 'block-sculpting';
-      inner = '<span class="block-num" style="color:#9fe1cb">' + (i+1) + '</span>'
-            + '<span class="block-name" style="color:#5dcaa5">' + (b.sculptor || '') + '</span>';
+      inner = '<span class="block-num" style="color:var(--bg)">' + (i+1) + '</span>'
+            + '<span class="block-name" style="color:var(--clay-light)">' + (b.sculptor || '') + '</span>';
     } else if (b.status === 'available') {
       cls += (selectedNextBlock === i) ? 'block-selected' : 'block-available';
-      var tc = (selectedNextBlock === i) ? '#85b7eb' : 'var(--text)';
-      var sc = (selectedNextBlock === i) ? '#85b7eb' : 'var(--hint)';
+      var tc = (selectedNextBlock === i) ? 'var(--clay-dark)' : 'var(--text)';
+      var sc = (selectedNextBlock === i) ? 'var(--clay-dark)' : 'var(--muted)';
       inner = '<span class="block-num" style="color:' + tc + '">' + (i+1) + '</span>'
             + '<span class="block-sub" style="color:' + sc + '">' + (selectedNextBlock === i ? 'selected' : 'tap') + '</span>';
     } else {
@@ -613,7 +555,6 @@ function renderHistory() {
   }).join('');
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
 validateGrid();
 document.getElementById('modal-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') confirmModal(); });
 document.getElementById('next-part-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') assignBlock(); });

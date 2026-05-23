@@ -2,13 +2,14 @@ import json
 import os
 import socket
 import threading
+import time as _time
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 from state import SessionState
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'clay_create_secret'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=False, engineio_logger=False)
 
 session = SessionState()
 
@@ -29,38 +30,15 @@ def udp_listener():
             print(f"[UDP] Error: {e}")
 
 def handle_gh_message(payload):
-    """
-    Accepts the JSON format sent by the existing C# GH component:
-    {
-        "elements": [{ "x":%, "y":%, "w":%, "h":%, "color":"#hex", "text":"..." }, ...],
-        "curves":   [{ "color":"#hex", "points":[{"x":%, "y":%}, ...] }, ...]
-    }
-    All coordinates are percentages (0-100) normalized to the GH Boundary rectangle.
-
-    Optionally, GH can add a "meta" key for Clay Create specific data:
-    {
-        "elements": [...],
-        "curves":   [...],
-        "meta": {
-            "block_index": 2,       # which block this projection belongs to
-            "stage": "sculpting"    # sculpting | done | idle
-        }
-    }
-    """
     elements = payload.get("elements", [])
     curves   = payload.get("curves",   [])
     meta     = payload.get("meta",     {})
-
-    # Store projection data in session so late-joining browsers get it
     session.set_projection(elements, curves, meta)
-
-    # Broadcast to all connected browsers immediately
     socketio.emit('projection_update', {
         'elements': elements,
         'curves':   curves,
         'meta':     meta
     })
-
     block_idx = meta.get("block_index", "?")
     print(f"[UDP] GH update — {len(elements)} elements, {len(curves)} curves, block={block_idx}")
 
@@ -68,6 +46,10 @@ def handle_gh_message(payload):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/projection')
+def projection():
+    return render_template('projection.html')
 
 @app.route('/api/state')
 def get_state():
@@ -80,6 +62,7 @@ def start_session():
     rows = data.get('rows', 3)
     participants = data.get('participants', 4)
     session.start(cols, rows, participants)
+    session.session_time = 0
     socketio.emit('session_started', session.to_dict())
     print(f"[Session] Started — {cols}x{rows} grid, {participants} participants")
     return jsonify({'status': 'ok', 'state': session.to_dict()})
@@ -121,35 +104,37 @@ def reset_block():
 @app.route('/api/session/reset', methods=['POST'])
 def reset_session():
     session.reset()
+    session.session_time = 0
     socketio.emit('session_reset', {})
     print("[Session] Full reset")
     return jsonify({'status': 'ok'})
 
-# ─── UDP SENDER (to Grasshopper) ──────────────────────────────────────────────
-GH_IP   = "127.0.0.1"   # Change to Grasshopper PC IP if different machine
-GH_PORT = 6006
-
+# ─── UDP SENDER (to Grasshopper) — non-blocking ───────────────────────────────
+GH_IP      = "127.0.0.1"
+GH_PORT    = 6006
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'gh_state.json')
 
-def send_to_grasshopper(payload):
+def _gh_send_worker(payload):
+    """Runs in background thread — never blocks the main request."""
     try:
         payload['state'] = session.to_dict()
-        # Write state to file — GHPython reads this every 200ms
         with open(STATE_FILE, 'w') as f:
             json.dump(payload, f)
-        # Also try UDP
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        message = json.dumps(payload).encode('utf-8')
-        sock.sendto(message, (GH_IP, GH_PORT))
+        sock.settimeout(0.1)   # 100 ms max, non-blocking
+        sock.sendto(json.dumps(payload).encode('utf-8'), (GH_IP, GH_PORT))
         sock.close()
         print(f"[UDP→GH] {payload.get('type')} — block={payload.get('block_index')}")
     except Exception as e:
         print(f"[UDP] Send error: {e}")
 
+def send_to_grasshopper(payload):
+    """Fire-and-forget: never delays the HTTP response."""
+    threading.Thread(target=_gh_send_worker, args=(payload,), daemon=True).start()
+
 # ─── WEBSOCKET EVENTS ──────────────────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
-    # Send full session state + last projection so late joiners are in sync
     emit('state_sync', session.to_dict())
     proj = session.get_projection()
     if proj:
@@ -160,9 +145,29 @@ def on_connect():
 def on_disconnect():
     print("[WS] Client disconnected")
 
+# ─── SESSION TIMER ─────────────────────────────────────────────────────────────
+def session_timer():
+    while True:
+        _time.sleep(1)
+        if not session.started:
+            continue
+        session.session_time = getattr(session, 'session_time', 0) + 1
+        ab = session.active_block
+        block_elapsed = 0
+        if ab is not None and 0 <= ab < len(session.blocks):
+            b = session.blocks[ab]
+            if b.get('start_time'):
+                block_elapsed = int(_time.time() - b['start_time'])
+        socketio.emit('tick', {
+            'session_time':  session.session_time,
+            'block_elapsed': block_elapsed,
+        })
+
 # ─── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    udp_thread = threading.Thread(target=udp_listener, daemon=True)
-    udp_thread.start()
-    print("[Clay Create] Server running on http://0.0.0.0:5000")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    session.session_time = 0
+    threading.Thread(target=udp_listener,  daemon=True).start()
+    threading.Thread(target=session_timer, daemon=True).start()
+    print("[Clay Create] Server     →  http://0.0.0.0:5000")
+    print("[Clay Create] Projection →  http://0.0.0.0:5000/projection")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
