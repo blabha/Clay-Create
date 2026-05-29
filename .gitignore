@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Large capture output folders (data, not code)
+z_History Heatmap_PNG/
+z_History Point Cloud/
+z_History Point Cloud_Mesh/
+z_Current Heatmap_PNG/
+z_Current Point cloud/
+z_Current Point Cloud_Mesh/
+z_CurrentTargetDesign/
+z_Completed Target Design/
+z_Current heatmap_Colour_PNG_Output/
+z_Target heatmap_Colour_PNG_Output/
+Current heatmap_Colour_PNG_Output/
+04_Point cloud/point clouds/
+
+# Claude internal
+.claude/
+
+# Logs / temp
+*.log
+gh_state.json

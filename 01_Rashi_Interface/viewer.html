@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>captured_pointcloud.ply viewer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #26384f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 58px;
+      padding: 12px 28px;
+      background: rgba(248, 250, 252, 0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .meta {
+      color: #53677f;
+      font-size: 13px;
+      margin-left: 8px;
+      font-weight: 500;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #42566f;
+      font-size: 13px;
+    }
+
+    .control {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    button,
+    select {
+      height: 32px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      background: #ffffff;
+      color: #26384f;
+      font: inherit;
+    }
+
+    button {
+      width: 36px;
+      cursor: pointer;
+    }
+
+    select {
+      padding: 0 28px 0 10px;
+    }
+
+    input[type="range"] {
+      width: 118px;
+      accent-color: #2563eb;
+    }
+
+    #viewport {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      cursor: grab;
+    }
+
+    #viewport:active {
+      cursor: grabbing;
+    }
+
+    .point-tooltip {
+      position: fixed;
+      z-index: 5;
+      min-width: 146px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.75);
+      border-radius: 7px;
+      background: rgba(236, 0, 108, 0.9);
+      color: #ffffff;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.22);
+      font-size: 12px;
+      line-height: 1.45;
+      pointer-events: none;
+    }
+
+    .point-tooltip.hidden,
+    .point-marker.hidden {
+      display: none;
+    }
+
+    .point-marker {
+      position: fixed;
+      z-index: 4;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #ffb000;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.86), 0 10px 20px rgba(15, 23, 42, 0.22);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .legend {
+      position: fixed;
+      top: 112px;
+      right: 34px;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 8px 10px;
+      align-items: stretch;
+      color: #334960;
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .legend-title {
+      grid-column: 1 / -1;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .bar {
+      width: 28px;
+      height: 74vh;
+      max-height: 620px;
+      min-height: 260px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: linear-gradient(to top,
+        #ff2200 0%,
+        #ff9100 12%,
+        #d4ff00 25%,
+        #00ff5d 38%,
+        #00d8ff 52%,
+        #004dff 66%,
+        #a000ff 82%,
+        #ff0062 100%);
+    }
+
+    .ticks {
+      position: relative;
+      width: 42px;
+      color: #415872;
+      font-size: 12px;
+    }
+
+    .tick {
+      position: absolute;
+      left: 0;
+      transform: translateY(50%);
+    }
+
+    .tick::before {
+      content: "";
+      position: absolute;
+      left: -9px;
+      top: 50%;
+      width: 6px;
+      border-top: 1px solid #475569;
+    }
+
+    .hud {
+      position: fixed;
+      left: 28px;
+      bottom: 24px;
+      z-index: 2;
+      display: flex;
+      gap: 12px;
+      color: #53677f;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .chip {
+      padding: 7px 10px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 4;
+      background: #f8fafc;
+      color: #334960;
+      font-size: 15px;
+      transition: opacity 160ms ease;
+    }
+
+    .loader-panel {
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+      max-width: 420px;
+      padding: 22px;
+      text-align: center;
+    }
+
+    .loader-panel input {
+      max-width: 100%;
+    }
+
+    .loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 10px 14px;
+      }
+
+      .controls {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+
+      .legend {
+        right: 12px;
+        top: 134px;
+      }
+
+      .bar {
+        height: 48vh;
+      }
+
+      .hud {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <span class="title">captured_pointcloud.ply</span>
+      <span class="meta" id="meta">loading</span>
+    </div>
+    <div class="controls">
+      <label class="control">Color
+        <select id="colorMode">
+          <option value="depth">Depth mod 200 mm</option>
+          <option value="rgb">RGB</option>
+          <option value="height">Height</option>
+        </select>
+      </label>
+      <label class="control">Point size <input id="pointSize" type="range" min="1" max="9" step="0.5" value="3.5"></label>
+      <button id="reset" title="Reset view" aria-label="Reset view">↺</button>
+    </div>
+  </header>
+
+  <canvas id="viewport"></canvas>
+  <div class="point-marker hidden" id="pointMarker"></div>
+  <div class="point-tooltip hidden" id="pointTooltip"></div>
+
+  <aside class="legend" id="legend">
+    <div class="legend-title" id="legendTitle">Depth mod 200 mm</div>
+    <div class="bar"></div>
+    <div class="ticks" id="ticks">
+      <span class="tick" style="bottom: 100%;">200</span>
+      <span class="tick" style="bottom: 75%;">150</span>
+      <span class="tick" style="bottom: 50%;">100</span>
+      <span class="tick" style="bottom: 25%;">50</span>
+      <span class="tick" style="bottom: 0%;">0</span>
+    </div>
+  </aside>
+
+  <div class="hud">
+    <div class="chip">drag rotate</div>
+    <div class="chip">wheel zoom</div>
+    <div class="chip">right-drag pan</div>
+    <div class="chip">hover point for xyz</div>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="loader-panel" id="loaderPanel">Loading captured_pointcloud.ply</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("viewport");
+    const meta = document.getElementById("meta");
+    const loading = document.getElementById("loading");
+    const loaderPanel = document.getElementById("loaderPanel");
+    const pointSizeControl = document.getElementById("pointSize");
+    const colorModeControl = document.getElementById("colorMode");
+    const legend = document.getElementById("legend");
+    const legendTitle = document.getElementById("legendTitle");
+    const pointTooltip = document.getElementById("pointTooltip");
+    const pointMarker = document.getElementById("pointMarker");
+
+    const gl = canvas.getContext("webgl", { antialias: true, alpha: false });
+    if (!gl) {
+      loading.textContent = "WebGL is not available in this browser.";
+      throw new Error("WebGL unavailable");
+    }
+
+    const vertexShaderSource = `
+      attribute vec3 a_position;
+      attribute vec3 a_color;
+      uniform mat4 u_matrix;
+      uniform float u_pointSize;
+      varying vec3 v_color;
+      void main() {
+        gl_Position = u_matrix * vec4(a_position, 1.0);
+        gl_PointSize = u_pointSize;
+        v_color = a_color;
+      }
+    `;
+
+    const fragmentShaderSource = `
+      precision mediump float;
+      varying vec3 v_color;
+      void main() {
+        vec2 uv = gl_PointCoord - vec2(0.5);
+        float d = dot(uv, uv);
+        if (d > 0.25) discard;
+        gl_FragColor = vec4(v_color, 1.0);
+      }
+    `;
+
+    const lineVertexShaderSource = `
+      attribute vec3 a_position;
+      attribute vec3 a_color;
+      uniform mat4 u_matrix;
+      varying vec3 v_color;
+      void main() {
+        gl_Position = u_matrix * vec4(a_position, 1.0);
+        v_color = a_color;
+      }
+    `;
+
+    const lineFragmentShaderSource = `
+      precision mediump float;
+      varying vec3 v_color;
+      void main() {
+        gl_FragColor = vec4(v_color, 1.0);
+      }
+    `;
+
+    function createShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(shader));
+      }
+      return shader;
+    }
+
+    function createProgram(vertexSource, fragmentSource) {
+      const program = gl.createProgram();
+      gl.attachShader(program, createShader(gl.VERTEX_SHADER, vertexSource));
+      gl.attachShader(program, createShader(gl.FRAGMENT_SHADER, fragmentSource));
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        throw new Error(gl.getProgramInfoLog(program));
+      }
+      return program;
+    }
+
+    const pointProgram = createProgram(vertexShaderSource, fragmentShaderSource);
+    const lineProgram = createProgram(lineVertexShaderSource, lineFragmentShaderSource);
+
+    const state = {
+      yaw: -0.7,
+      pitch: 0.62,
+      distance: 2.15,
+      panX: 0,
+      panY: 0,
+      pointSize: Number(pointSizeControl.value),
+      dragging: false,
+      panning: false,
+      lastX: 0,
+      lastY: 0,
+      hoverX: 0,
+      hoverY: 0,
+      hoveredIndex: -1,
+      cloud: null,
+      colorMode: "depth"
+    };
+
+    const buffers = {
+      points: gl.createBuffer(),
+      colors: gl.createBuffer(),
+      lines: gl.createBuffer(),
+      lineColors: gl.createBuffer()
+    };
+
+    function parsePly(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let headerEnd = -1;
+      for (let i = 0; i < bytes.length - 10; i += 1) {
+        if (
+          bytes[i] === 101 && bytes[i + 1] === 110 && bytes[i + 2] === 100 &&
+          bytes[i + 3] === 95 && bytes[i + 4] === 104 && bytes[i + 5] === 101 &&
+          bytes[i + 6] === 97 && bytes[i + 7] === 100 && bytes[i + 8] === 101 &&
+          bytes[i + 9] === 114
+        ) {
+          headerEnd = i;
+          while (headerEnd < bytes.length && bytes[headerEnd] !== 10) headerEnd += 1;
+          headerEnd += 1;
+          break;
+        }
+      }
+      if (headerEnd < 0) throw new Error("Could not find PLY header.");
+
+      const header = new TextDecoder().decode(bytes.slice(0, headerEnd));
+      if (!header.includes("format binary_little_endian")) {
+        throw new Error("This viewer expects binary_little_endian PLY.");
+      }
+
+      const vertexMatch = header.match(/element vertex\s+(\d+)/);
+      if (!vertexMatch) throw new Error("Could not read vertex count.");
+      const count = Number(vertexMatch[1]);
+
+      const view = new DataView(buffer, headerEnd);
+      const stride = 27;
+      const positions = new Float32Array(count * 3);
+      const rgb = new Float32Array(count * 3);
+      const depthColors = new Float32Array(count * 3);
+      const heightColors = new Float32Array(count * 3);
+      const bounds = {
+        minX: Infinity, minY: Infinity, minZ: Infinity,
+        maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity
+      };
+
+      for (let i = 0; i < count; i += 1) {
+        const base = i * stride;
+        const x = view.getFloat64(base, true);
+        const y = view.getFloat64(base + 8, true);
+        const z = view.getFloat64(base + 16, true);
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+        rgb[i * 3] = bytes[headerEnd + base + 24] / 255;
+        rgb[i * 3 + 1] = bytes[headerEnd + base + 25] / 255;
+        rgb[i * 3 + 2] = bytes[headerEnd + base + 26] / 255;
+        bounds.minX = Math.min(bounds.minX, x);
+        bounds.minY = Math.min(bounds.minY, y);
+        bounds.minZ = Math.min(bounds.minZ, z);
+        bounds.maxX = Math.max(bounds.maxX, x);
+        bounds.maxY = Math.max(bounds.maxY, y);
+        bounds.maxZ = Math.max(bounds.maxZ, z);
+      }
+
+      for (let i = 0; i < count; i += 1) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        const depthMeters = Math.abs(z);
+        const depthModulo = ((depthMeters * 1000) % 200) / 200;
+        const depthColor = rainbow(depthModulo);
+        depthColors.set(depthColor, i * 3);
+
+        const heightNorm = normalize(y, bounds.minY, bounds.maxY);
+        heightColors.set(rainbow(heightNorm), i * 3);
+      }
+
+      return { count, positions, rgb, depthColors, heightColors, bounds };
+    }
+
+    function normalize(value, min, max) {
+      if (max <= min) return 0;
+      return Math.min(1, Math.max(0, (value - min) / (max - min)));
+    }
+
+    function rainbow(t) {
+      const stops = [
+        [1.0, 0.13, 0.0],
+        [1.0, 0.57, 0.0],
+        [0.83, 1.0, 0.0],
+        [0.0, 1.0, 0.36],
+        [0.0, 0.85, 1.0],
+        [0.0, 0.3, 1.0],
+        [0.63, 0.0, 1.0],
+        [1.0, 0.0, 0.38]
+      ];
+      const scaled = Math.min(0.999, Math.max(0, t)) * (stops.length - 1);
+      const i = Math.floor(scaled);
+      const f = scaled - i;
+      return [
+        stops[i][0] + (stops[i + 1][0] - stops[i][0]) * f,
+        stops[i][1] + (stops[i + 1][1] - stops[i][1]) * f,
+        stops[i][2] + (stops[i + 1][2] - stops[i][2]) * f
+      ];
+    }
+
+    function uploadCloud(cloud) {
+      state.cloud = cloud;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.points);
+      gl.bufferData(gl.ARRAY_BUFFER, cloud.positions, gl.STATIC_DRAW);
+      updateColors();
+
+      const lines = buildGridAndAxes(cloud.bounds);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.lines);
+      gl.bufferData(gl.ARRAY_BUFFER, lines.positions, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.lineColors);
+      gl.bufferData(gl.ARRAY_BUFFER, lines.colors, gl.STATIC_DRAW);
+      state.lineCount = lines.positions.length / 3;
+
+      const size = Math.max(
+        cloud.bounds.maxX - cloud.bounds.minX,
+        cloud.bounds.maxY - cloud.bounds.minY,
+        cloud.bounds.maxZ - cloud.bounds.minZ
+      );
+      state.distance = Math.max(0.6, size * 3.2);
+      state.panX = 0;
+      state.panY = 0;
+      meta.textContent = `${cloud.count.toLocaleString()} points`;
+      loading.classList.add("hidden");
+      requestAnimationFrame(draw);
+    }
+
+    function updateColors() {
+      const cloud = state.cloud;
+      if (!cloud) return;
+      const colors = state.colorMode === "rgb"
+        ? cloud.rgb
+        : state.colorMode === "height"
+          ? cloud.heightColors
+          : cloud.depthColors;
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.colors);
+      gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+      legend.style.display = state.colorMode === "rgb" ? "none" : "grid";
+      legendTitle.textContent = state.colorMode === "height" ? "Height" : "Depth mod 200 mm";
+      requestAnimationFrame(draw);
+    }
+
+    function buildGridAndAxes(bounds) {
+      const cx = (bounds.minX + bounds.maxX) / 2;
+      const cy = (bounds.minY + bounds.maxY) / 2;
+      const cz = (bounds.minZ + bounds.maxZ) / 2;
+      const sx = Math.max(0.2, bounds.maxX - bounds.minX);
+      const sy = Math.max(0.2, bounds.maxY - bounds.minY);
+      const sz = Math.max(0.2, bounds.maxZ - bounds.minZ);
+      const extent = Math.max(sx, sy, sz) * 0.75;
+      const y = bounds.minY - sy * 0.08;
+      const positions = [];
+      const colors = [];
+
+      function addLine(a, b, color) {
+        positions.push(...a, ...b);
+        colors.push(...color, ...color);
+      }
+
+      for (let i = -5; i <= 5; i += 1) {
+        const v = i / 5 * extent;
+        addLine([cx - extent, y, cz + v], [cx + extent, y, cz + v], [0.82, 0.87, 0.92]);
+        addLine([cx + v, y, cz - extent], [cx + v, y, cz + extent], [0.82, 0.87, 0.92]);
+      }
+
+      addLine([cx - extent, y, cz], [cx + extent, y, cz], [0.18, 0.26, 0.36]);
+      addLine([cx, y, cz - extent], [cx, y, cz + extent], [0.18, 0.26, 0.36]);
+      addLine([cx, y, cz], [cx, y + extent, cz], [0.18, 0.26, 0.36]);
+      addLine([cx, y + extent, cz], [cx, y + extent * 0.92, cz + extent * 0.05], [0.18, 0.26, 0.36]);
+      addLine([cx, y + extent, cz], [cx + extent * 0.05, y + extent * 0.92, cz], [0.18, 0.26, 0.36]);
+
+      return {
+        positions: new Float32Array(positions),
+        colors: new Float32Array(colors)
+      };
+    }
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.floor(canvas.clientWidth * dpr);
+      const height = Math.floor(canvas.clientHeight * dpr);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+
+    function draw() {
+      if (!state.cloud) return;
+      resize();
+      gl.clearColor(0.972, 0.98, 0.988, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      const matrix = computeMatrix();
+      drawLines(matrix);
+      drawPoints(matrix);
+      updateHoverOverlay(matrix);
+    }
+
+    function drawPoints(matrix) {
+      gl.useProgram(pointProgram);
+      const positionLocation = gl.getAttribLocation(pointProgram, "a_position");
+      const colorLocation = gl.getAttribLocation(pointProgram, "a_color");
+      const matrixLocation = gl.getUniformLocation(pointProgram, "u_matrix");
+      const pointSizeLocation = gl.getUniformLocation(pointProgram, "u_pointSize");
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.points);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.colors);
+      gl.enableVertexAttribArray(colorLocation);
+      gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
+
+      gl.uniformMatrix4fv(matrixLocation, false, matrix);
+      gl.uniform1f(pointSizeLocation, state.pointSize * Math.min(window.devicePixelRatio || 1, 2));
+      gl.drawArrays(gl.POINTS, 0, state.cloud.count);
+    }
+
+    function drawLines(matrix) {
+      gl.useProgram(lineProgram);
+      const positionLocation = gl.getAttribLocation(lineProgram, "a_position");
+      const colorLocation = gl.getAttribLocation(lineProgram, "a_color");
+      const matrixLocation = gl.getUniformLocation(lineProgram, "u_matrix");
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.lines);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.lineColors);
+      gl.enableVertexAttribArray(colorLocation);
+      gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
+
+      gl.uniformMatrix4fv(matrixLocation, false, matrix);
+      gl.lineWidth(1);
+      gl.drawArrays(gl.LINES, 0, state.lineCount);
+    }
+
+    function computeMatrix() {
+      const b = state.cloud.bounds;
+      const center = [
+        (b.minX + b.maxX) / 2,
+        (b.minY + b.maxY) / 2,
+        (b.minZ + b.maxZ) / 2
+      ];
+      const aspect = canvas.width / Math.max(1, canvas.height);
+      const projection = perspective(Math.PI / 4, aspect, 0.01, 100);
+      const view = identity();
+      translate(view, state.panX, state.panY, -state.distance);
+      rotateX(view, state.pitch);
+      rotateY(view, state.yaw);
+      translate(view, -center[0], -center[1], -center[2]);
+      return multiply(projection, view);
+    }
+
+    function projectPoint(matrix, x, y, z) {
+      const clipX = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+      const clipY = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+      const clipZ = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+      const clipW = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+      if (clipW <= 0.00001) return null;
+
+      const ndcX = clipX / clipW;
+      const ndcY = clipY / clipW;
+      const ndcZ = clipZ / clipW;
+      if (ndcX < -1 || ndcX > 1 || ndcY < -1 || ndcY > 1 || ndcZ < -1 || ndcZ > 1) {
+        return null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: rect.left + (ndcX * 0.5 + 0.5) * rect.width,
+        y: rect.top + (0.5 - ndcY * 0.5) * rect.height,
+        depth: ndcZ
+      };
+    }
+
+    function pickPoint(clientX, clientY) {
+      if (!state.cloud) return -1;
+      const matrix = computeMatrix();
+      const positions = state.cloud.positions;
+      const threshold = Math.max(11, state.pointSize * 3.25);
+      const thresholdSq = threshold * threshold;
+      let bestIndex = -1;
+      let bestDistanceSq = thresholdSq;
+      let bestDepth = Infinity;
+
+      for (let i = 0; i < state.cloud.count; i += 1) {
+        const offset = i * 3;
+        const projected = projectPoint(matrix, positions[offset], positions[offset + 1], positions[offset + 2]);
+        if (!projected) continue;
+        const dx = projected.x - clientX;
+        const dy = projected.y - clientY;
+        const distanceSq = dx * dx + dy * dy;
+        if (distanceSq < bestDistanceSq || (distanceSq === bestDistanceSq && projected.depth < bestDepth)) {
+          bestDistanceSq = distanceSq;
+          bestDepth = projected.depth;
+          bestIndex = i;
+        }
+      }
+
+      state.hoveredIndex = bestIndex;
+      updateHoverOverlay(matrix);
+    }
+
+    function updateHoverOverlay(matrix = computeMatrix()) {
+      if (!state.cloud || state.hoveredIndex < 0) {
+        pointTooltip.classList.add("hidden");
+        pointMarker.classList.add("hidden");
+        return;
+      }
+
+      const offset = state.hoveredIndex * 3;
+      const positions = state.cloud.positions;
+      const x = positions[offset];
+      const y = positions[offset + 1];
+      const z = positions[offset + 2];
+      const projected = projectPoint(matrix, x, y, z);
+      if (!projected) {
+        pointTooltip.classList.add("hidden");
+        pointMarker.classList.add("hidden");
+        return;
+      }
+
+      pointMarker.style.left = `${projected.x}px`;
+      pointMarker.style.top = `${projected.y}px`;
+      pointMarker.classList.remove("hidden");
+
+      pointTooltip.innerHTML = `
+        <strong>point ${state.hoveredIndex.toLocaleString()}</strong><br>
+        x: ${x.toFixed(4)} m<br>
+        y: ${y.toFixed(4)} m<br>
+        z: ${z.toFixed(4)} m
+      `;
+      const left = Math.min(window.innerWidth - 170, state.hoverX + 12);
+      const top = Math.min(window.innerHeight - 112, state.hoverY + 12);
+      pointTooltip.style.left = `${Math.max(8, left)}px`;
+      pointTooltip.style.top = `${Math.max(8, top)}px`;
+      pointTooltip.classList.remove("hidden");
+    }
+
+    function identity() {
+      return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    }
+
+    function perspective(fovy, aspect, near, far) {
+      const f = 1 / Math.tan(fovy / 2);
+      const nf = 1 / (near - far);
+      return new Float32Array([
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far + near) * nf, -1,
+        0, 0, (2 * far * near) * nf, 0
+      ]);
+    }
+
+    function multiply(a, b) {
+      const out = new Float32Array(16);
+      for (let row = 0; row < 4; row += 1) {
+        for (let col = 0; col < 4; col += 1) {
+          out[col * 4 + row] =
+            a[0 * 4 + row] * b[col * 4 + 0] +
+            a[1 * 4 + row] * b[col * 4 + 1] +
+            a[2 * 4 + row] * b[col * 4 + 2] +
+            a[3 * 4 + row] * b[col * 4 + 3];
+        }
+      }
+      return out;
+    }
+
+    function translate(m, x, y, z) {
+      m[12] += m[0] * x + m[4] * y + m[8] * z;
+      m[13] += m[1] * x + m[5] * y + m[9] * z;
+      m[14] += m[2] * x + m[6] * y + m[10] * z;
+      m[15] += m[3] * x + m[7] * y + m[11] * z;
+    }
+
+    function rotateX(m, angle) {
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const m4 = m[4], m5 = m[5], m6 = m[6], m7 = m[7];
+      const m8 = m[8], m9 = m[9], m10 = m[10], m11 = m[11];
+      m[4] = m4 * c + m8 * s;
+      m[5] = m5 * c + m9 * s;
+      m[6] = m6 * c + m10 * s;
+      m[7] = m7 * c + m11 * s;
+      m[8] = m8 * c - m4 * s;
+      m[9] = m9 * c - m5 * s;
+      m[10] = m10 * c - m6 * s;
+      m[11] = m11 * c - m7 * s;
+    }
+
+    function rotateY(m, angle) {
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const m0 = m[0], m1 = m[1], m2 = m[2], m3 = m[3];
+      const m8 = m[8], m9 = m[9], m10 = m[10], m11 = m[11];
+      m[0] = m0 * c - m8 * s;
+      m[1] = m1 * c - m9 * s;
+      m[2] = m2 * c - m10 * s;
+      m[3] = m3 * c - m11 * s;
+      m[8] = m0 * s + m8 * c;
+      m[9] = m1 * s + m9 * c;
+      m[10] = m2 * s + m10 * c;
+      m[11] = m3 * s + m11 * c;
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      state.dragging = true;
+      state.panning = event.button === 2 || event.shiftKey;
+      state.lastX = event.clientX;
+      state.lastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      state.hoverX = event.clientX;
+      state.hoverY = event.clientY;
+      if (!state.dragging) {
+        pickPoint(event.clientX, event.clientY);
+        return;
+      }
+      const dx = event.clientX - state.lastX;
+      const dy = event.clientY - state.lastY;
+      state.lastX = event.clientX;
+      state.lastY = event.clientY;
+      if (state.panning) {
+        state.panX += dx * 0.0015 * state.distance;
+        state.panY -= dy * 0.0015 * state.distance;
+      } else {
+        state.yaw += dx * 0.008;
+        state.pitch = Math.max(-1.45, Math.min(1.45, state.pitch + dy * 0.008));
+      }
+      if (state.hoveredIndex >= 0) {
+        pickPoint(event.clientX, event.clientY);
+      }
+      requestAnimationFrame(draw);
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      state.dragging = false;
+      canvas.releasePointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      state.hoveredIndex = -1;
+      pointTooltip.classList.add("hidden");
+      pointMarker.classList.add("hidden");
+    });
+
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const factor = Math.exp(event.deltaY * 0.001);
+      state.distance = Math.max(0.08, Math.min(30, state.distance * factor));
+      requestAnimationFrame(draw);
+    }, { passive: false });
+
+    pointSizeControl.addEventListener("input", () => {
+      state.pointSize = Number(pointSizeControl.value);
+      requestAnimationFrame(draw);
+    });
+
+    colorModeControl.addEventListener("change", () => {
+      state.colorMode = colorModeControl.value;
+      updateColors();
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      state.yaw = -0.7;
+      state.pitch = 0.62;
+      state.panX = 0;
+      state.panY = 0;
+      if (state.cloud) {
+        const b = state.cloud.bounds;
+        state.distance = Math.max(0.6, Math.max(b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ) * 3.2);
+      }
+      requestAnimationFrame(draw);
+    });
+
+    window.addEventListener("resize", () => requestAnimationFrame(draw));
+
+    function showFilePicker(message) {
+      loaderPanel.innerHTML = `
+        <strong>${message}</strong>
+        <span>Choose captured_pointcloud.ply to open it directly from disk.</span>
+        <input id="plyFile" type="file" accept=".ply">
+      `;
+      document.getElementById("plyFile").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        meta.textContent = file.name;
+        file.arrayBuffer()
+          .then(parsePly)
+          .then(uploadCloud)
+          .catch((error) => {
+            loaderPanel.textContent = error.message;
+            console.error(error);
+          });
+      });
+    }
+
+    fetch("captured_pointcloud.ply")
+      .then((response) => {
+        if (!response.ok) throw new Error(`Could not load captured_pointcloud.ply: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(parsePly)
+      .then(uploadCloud)
+      .catch((error) => {
+        showFilePicker("Could not auto-load the PLY file.");
+        console.error(error);
+      });
+  </script>
+</body>
+</html>

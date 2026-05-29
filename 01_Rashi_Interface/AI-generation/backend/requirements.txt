@@ -1,0 +1,23 @@
+# PyTorch — install separately with CUDA if available:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+# CPU-only fallback:
+#   pip install torch torchvision
+torch>=2.2.0
+torchvision>=0.17.0
+
+# MiDaS dependency
+timm>=0.9.16
+
+# Image processing
+opencv-python-headless>=4.8.0
+Pillow>=10.3.0
+
+# API
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Numerics / visualisation
+numpy>=1.26.0
+scipy>=1.13.0
+matplotlib>=3.8.0

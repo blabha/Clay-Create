@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clay Create — Operator Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+var state = {};
+var selectedNextBlock = null;
+var timerInterval = null;
+var timerStart = null;
+var ui = { cols: 3, rows: 3, participants: 4 };
+</script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:         #FDFAF7;
+  --surface:    #FFFFFF;
+  --surface2:   #F5EDE3;
+  --border:     #EDE0D0;
+  --border-md:  #D4B89A;
+  --text:       #2C1810;
+  --muted:      #8B6F5E;
+  --hint:       #B08060;
+  --radius:     8px;
+  --radius-lg:  12px;
+  --clay:       #A67C5B;
+  --clay-dark:  #7A4520;
+  --clay-light: #F0E8DC;
+  --clay-bg:    #FBF0E6;
+  --sand:       #D4C4B0;
+  --sand-dark:  #4A2C1A;
+  --amber-bd:   #C4956A;
+  --red-text:   #8B3A2A;
+  --red-bd:     #C4956A;
+  --red-bg:     #FBF0E6;
+}
+body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+.app { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+/* HEADER */
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark { width: 32px; height: 32px; border-radius: var(--radius); background: var(--sand-dark); border: 1px solid var(--clay); display: flex; align-items: center; justify-content: center; }
+.logo-text { font-size: 15px; font-weight: 500; color: var(--text); letter-spacing: 0.01em; }
+.logo-sub  { font-size: 11px; color: var(--muted); }
+.hdr-right { display: flex; align-items: center; gap: 10px; }
+.status-pill { font-size: 11px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border-md); color: var(--muted); background: var(--surface); }
+.status-pill.active { background: var(--clay-bg); color: var(--clay-dark); border-color: var(--amber-bd); }
+
+/* METRICS */
+.metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.5rem; }
+.metric { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .875rem 1rem; }
+.metric-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .06em; font-weight: 400; }
+.metric-value { font-size: 24px; font-weight: 500; color: var(--text); }
+.metric-sub   { font-size: 11px; color: var(--hint); margin-top: 2px; }
+
+/* SETUP */
+.setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1.5rem; }
+.section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 500; margin-bottom: 10px; }
+.setup-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.field-group { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 11px; color: var(--muted); }
+.number-input { display: flex; align-items: center; gap: 8px; }
+.num-btn { width: 28px; height: 28px; border-radius: var(--radius); border: 1px solid var(--border-md); background: var(--bg); color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.num-btn:hover { background: var(--clay-light); border-color: var(--clay); }
+.num-val { font-size: 20px; font-weight: 500; min-width: 28px; text-align: center; color: var(--text); }
+.divider-v { width: 1px; height: 48px; background: var(--border); }
+.alert { display: none; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius); font-size: 13px; margin-top: 12px; border: 1px solid; }
+.alert.warn { background: var(--clay-bg); color: var(--clay-dark); border-color: var(--amber-bd); }
+.alert.ok   { background: var(--clay-light); color: var(--sand-dark); border-color: var(--border-md); }
+
+/* LAYOUT */
+.main { display: grid; grid-template-columns: 1fr 280px; gap: 1.5rem; }
+.side-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
+
+/* GRID */
+.block-grid { display: grid; gap: 8px; margin-bottom: 1rem; }
+.block { border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 62px; aspect-ratio: 1; position: relative; transition: all .15s; user-select: none; }
+.block-done      { background: var(--sand); border: 1px solid #C4A882; opacity: .8; cursor: default; }
+.block-sculpting { background: var(--clay); border: 2px solid var(--clay-dark); cursor: default; }
+.block-available { background: var(--surface); border: 1.5px dashed var(--amber-bd); cursor: pointer; }
+.block-available:hover { background: var(--clay-bg); border-color: var(--clay); }
+.block-selected  { background: var(--clay-bg); border: 2px solid var(--clay-dark); cursor: pointer; }
+.block-pending   { background: var(--clay-light); border: 1px solid var(--border); cursor: not-allowed; }
+.block-num  { font-size: 11px; font-weight: 500; color: var(--sand-dark); }
+.block-name { font-size: 10px; text-align: center; padding: 0 4px; margin-top: 1px; color: var(--clay-dark); }
+.block-sub  { font-size: 9px; text-align: center; color: var(--muted); }
+.check-mark { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--sand-dark); display: flex; align-items: center; justify-content: center; }
+.check-mark svg { width: 8px; height: 8px; }
+.grid-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.legend-dot  { width: 10px; height: 10px; border-radius: 3px; }
+
+/* SIDEBAR */
+.sidebar { display: flex; flex-direction: column; gap: 1rem; }
+.current-block-card { background: var(--clay-light); border: 1px solid var(--amber-bd); border-radius: var(--radius-lg); padding: 1.25rem; }
+.cb-label { font-size: 11px; color: var(--clay-dark); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+.cb-name  { font-size: 20px; font-weight: 500; color: var(--text); margin-top: 2px; }
+.cb-sub   { font-size: 12px; color: var(--clay-dark); }
+.timer    { font-size: 30px; font-weight: 300; color: var(--text); margin: 10px 0 2px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.timer-lbl{ font-size: 11px; color: var(--muted); }
+.next-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
+.fallback-notice { background: var(--clay-bg); border: 1px solid var(--amber-bd); border-radius: var(--radius); padding: 7px 10px; font-size: 12px; color: var(--clay-dark); margin-bottom: 10px; display: none; }
+.reuse-notice    { background: var(--clay-light); border: 1px solid var(--border-md); border-radius: var(--radius); padding: 7px 10px; font-size: 12px; color: var(--sand-dark); margin-bottom: 10px; }
+.sel-badge       { background: var(--clay-bg); border: 1px solid var(--amber-bd); border-radius: var(--radius); padding: 5px 10px; font-size: 12px; color: var(--clay-dark); display: none; margin: 6px 0; }
+.sel-hint { font-size: 12px; color: var(--muted); margin: 8px 0; }
+.edge-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--clay-light); font-size: 12px; }
+.edge-row:last-child { border-bottom: none; }
+.edge-badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; border: 1px solid; }
+.edge-free { background: var(--clay-light); color: var(--muted); border-color: var(--border); }
+.edge-cond { background: var(--clay-bg); color: var(--clay-dark); border-color: var(--amber-bd); }
+.part-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--clay-light); }
+.part-row:last-child { border-bottom: none; }
+.avatar   { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; flex-shrink: 0; }
+.av-done  { background: var(--sand); color: var(--sand-dark); }
+.av-active{ background: var(--clay); color: var(--bg); }
+.part-badge  { font-size: 10px; padding: 2px 8px; border-radius: 99px; }
+.pb-done  { background: var(--clay-light); color: var(--sand-dark); }
+.pb-sculpt{ background: var(--clay); color: var(--bg); }
+.hist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--clay-light); font-size: 12px; }
+.hist-row:last-child { border-bottom: none; }
+.hist-num { width: 22px; height: 22px; border-radius: 4px; background: var(--clay-light); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: var(--muted); flex-shrink: 0; }
+.empty { text-align: center; padding: 1.5rem; color: var(--hint); font-size: 13px; }
+
+/* BUTTONS */
+.btn-primary   { width: 100%; padding: 9px 16px; background: var(--sand-dark); color: var(--bg); border: none; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity .15s; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-secondary { width: 100%; padding: 8px 16px; background: transparent; color: var(--text); border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.btn-secondary:hover { background: var(--clay-light); }
+.btn-danger    { width: 100%; padding: 8px 16px; background: transparent; color: var(--red-text); border: 1px solid var(--red-bd); border-radius: var(--radius); font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.btn-danger:hover { background: var(--red-bg); }
+.btn-sm        { width: auto; padding: 5px 14px; font-size: 12px; }
+
+/* INPUTS */
+input[type="text"], select {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-md);
+  border-radius: var(--radius); font-size: 13px; font-family: 'DM Sans', sans-serif;
+  color: var(--text); background: var(--bg); outline: none;
+}
+input[type="text"]:focus, select:focus { border-color: var(--clay); }
+
+/* MODALS */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(44,24,16,.35); align-items: center; justify-content: center; z-index: 100; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border-md); padding: 1.5rem; width: 320px; }
+.modal-title { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+.modal-sub   { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 12px; }
+.modal-actions .btn-primary, .modal-actions .btn-secondary, .modal-actions .btn-danger { flex: 1; }
+
+/* UTILS */
+.gap-6 { display: flex; flex-direction: column; gap: 6px; }
+.mt-8  { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 26 26" fill="none" width="20" height="20">
+          <path d="M5 20 L13 6 L21 20 Z" fill="#4A2C1A" stroke="#A67C5B" stroke-width="1"/>
+          <path d="M8 20 L13 11 L18 20 Z" fill="#A67C5B"/>
+          <line x1="5" y1="16" x2="21" y2="16" stroke="#C4956A" stroke-width="1" stroke-dasharray="2 2"/>
+          <line x1="7" y1="20" x2="19" y2="20" stroke="#C4956A" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">Clay Create</div>
+        <div class="logo-sub">Operator dashboard</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <button id="reset-btn" onclick="askReset()" class="btn-danger btn-sm" style="display:none;">Reset session</button>
+      <div class="status-pill" id="status-pill">Session not started</div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Participants</div><div class="metric-value" id="m-p">—</div><div class="metric-sub">registered</div></div>
+    <div class="metric"><div class="metric-label">Blocks total</div><div class="metric-value" id="m-b">—</div><div class="metric-sub" id="m-gs">grid not set</div></div>
+    <div class="metric"><div class="metric-label">Completed</div><div class="metric-value" id="m-c">0</div><div class="metric-sub">blocks done</div></div>
+    <div class="metric"><div class="metric-label">Progress</div><div class="metric-value" id="m-pr">—</div><div class="metric-sub">of total</div></div>
+  </div>
+
+  <div class="setup-card" id="setup-card">
+    <p class="section-label">Session setup</p>
+    <div class="setup-row">
+      <div class="field-group"><div class="field-label">Columns</div><div class="number-input"><button class="num-btn" onclick="adjustGrid('cols',-1)">−</button><span class="num-val" id="cols-val">3</span><button class="num-btn" onclick="adjustGrid('cols',1)">+</button></div></div>
+      <div class="divider-v"></div>
+      <div class="field-group"><div class="field-label">Rows</div><div class="number-input"><button class="num-btn" onclick="adjustGrid('rows',-1)">−</button><span class="num-val" id="rows-val">3</span><button class="num-btn" onclick="adjustGrid('rows',1)">+</button></div></div>
+      <div class="divider-v"></div>
+      <div class="field-group"><div class="field-label">Participants</div><div class="number-input"><button class="num-btn" onclick="adjustParts(-1)">−</button><span class="num-val" id="parts-val">4</span><button class="num-btn" onclick="adjustParts(1)">+</button></div></div>
+      <div class="divider-v"></div>
+      <button class="btn-primary" style="width:auto;padding:9px 24px;" onclick="startSession()">Start session</button>
+    </div>
+    <div class="alert" id="grid-alert"></div>
+  </div>
+
+  <div class="main">
+    <div>
+      <p class="section-label">Block grid</p>
+      <div class="side-card">
+        <div class="block-grid" id="block-grid"><div class="empty">Set up a session to see the grid</div></div>
+        <div class="grid-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--clay);border:1.5px solid var(--clay-dark);"></div>Sculpting</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--sand);border:1px solid #C4A882;"></div>Done</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--surface);border:1.5px dashed var(--amber-bd);"></div>Available</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--clay-light);border:1px solid var(--border);"></div>Locked</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div id="current-block-area" style="display:none;">
+        <p class="section-label">Now sculpting</p>
+        <div class="current-block-card">
+          <div class="cb-label">Active block</div>
+          <div class="cb-name" id="cb-name">—</div>
+          <div class="cb-sub"  id="cb-sub">—</div>
+          <div class="timer"   id="cb-timer">00:00</div>
+          <div class="timer-lbl">elapsed</div>
+          <div class="gap-6 mt-10">
+            <button class="btn-primary" onclick="markDone()">Mark as completed</button>
+            <button class="btn-danger"  onclick="resetBlock()">Reset block</button>
+          </div>
+        </div>
+        <div class="side-card mt-10">
+          <p class="section-label">Edge conditions</p>
+          <div id="edge-list"></div>
+        </div>
+      </div>
+
+      <div id="next-block-area" style="display:none;">
+        <p class="section-label">Next participant</p>
+        <div class="next-card">
+          <div class="fallback-notice" id="fallback-notice">No direct neighbors — showing all reachable blocks.</div>
+          <div id="new-participant-mode">
+            <div class="field-label">Participant name</div>
+            <input type="text" id="next-part-name" placeholder="Enter name..." style="margin-top:5px;" />
+          </div>
+          <div id="reuse-participant-mode" style="display:none;">
+            <div class="reuse-notice">All participants have sculpted — select who continues.</div>
+            <div class="field-label">Select participant</div>
+            <select id="participant-select" style="margin-top:5px;"></select>
+          </div>
+          <div class="sel-hint" id="sel-hint">Click an available block in the grid</div>
+          <div class="sel-badge" id="sel-badge">—</div>
+          <button class="btn-primary mt-8" onclick="assignBlock()">Begin sculpting</button>
+        </div>
+      </div>
+
+      <div>
+        <p class="section-label">Participants</p>
+        <div class="side-card"><div id="participant-list"><div class="empty">Session not started</div></div></div>
+      </div>
+      <div>
+        <p class="section-label">History</p>
+        <div class="side-card"><div id="history-list"><div class="empty">No blocks completed yet</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Name the first participant</div>
+    <div class="modal-sub"   id="modal-sub">Block 1 sets the edge pattern for the whole wall.</div>
+    <input type="text" id="modal-input" placeholder="Participant name..." />
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary"   onclick="confirmModal()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reset-overlay">
+  <div class="modal" style="border-top:2px solid var(--red-bd);">
+    <div class="modal-title" style="color:var(--red-text);">Reset session?</div>
+    <div class="modal-sub">All blocks, participants and history will be cleared. This cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeReset()">Cancel</button>
+      <button class="btn-danger"    onclick="confirmReset()">Yes, reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+
+socket.on('connect',           ()   => console.log('[WS] Connected'));
+socket.on('state_sync',        data => applyState(data));
+socket.on('session_started',   data => { applyState(data); showGrid(); });
+socket.on('block_assigned',    data => applyState(data));
+socket.on('block_completed',   data => applyState(data));
+socket.on('block_reset',       data => applyState(data));
+socket.on('session_reset',     ()   => location.reload());
+socket.on('projection_update', data => console.log('[GH]', data));
+
+function applyState(s) {
+  state = s;
+  renderMetrics();
+  renderGrid();
+  renderCurrentBlock();
+  renderNextPanel();
+  renderParticipants();
+  renderHistory();
+}
+
+function adjustGrid(dim, delta) {
+  if (state.started) return;
+  if (dim === 'cols') ui.cols = Math.max(1, Math.min(8, ui.cols + delta));
+  else                ui.rows = Math.max(1, Math.min(8, ui.rows + delta));
+  ui.participants = Math.min(ui.participants, ui.cols * ui.rows);
+  document.getElementById('cols-val').textContent  = ui.cols;
+  document.getElementById('rows-val').textContent  = ui.rows;
+  document.getElementById('parts-val').textContent = ui.participants;
+  validateGrid();
+}
+
+function adjustParts(delta) {
+  if (state.started) return;
+  ui.participants = Math.max(1, Math.min(ui.cols * ui.rows, ui.participants + delta));
+  document.getElementById('parts-val').textContent = ui.participants;
+  validateGrid();
+}
+
+function validateGrid() {
+  var total = ui.cols * ui.rows;
+  var diff  = total - ui.participants;
+  var el    = document.getElementById('grid-alert');
+  if (diff > 0) {
+    el.style.display = 'flex'; el.className = 'alert warn';
+    el.textContent = diff + ' block' + (diff > 1 ? 's' : '') + ' unassigned — participants will sculpt more than one block.';
+  } else {
+    el.style.display = 'flex'; el.className = 'alert ok';
+    el.textContent = 'Grid fits all ' + ui.participants + ' participants — one block each.';
+  }
+}
+
+function startSession() {
+  fetch('/api/session/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cols: ui.cols, rows: ui.rows, participants: ui.participants })
+  });
+}
+
+function showGrid() {
+  document.getElementById('setup-card').style.display   = 'none';
+  document.getElementById('reset-btn').style.display    = 'block';
+  document.getElementById('status-pill').textContent    = 'Session active';
+  document.getElementById('status-pill').className      = 'status-pill active';
+  openModal('Name the first participant', 'Block 1 sets the edge pattern for the whole wall.');
+}
+
+function openModal(t, s) {
+  document.getElementById('modal-title').textContent = t;
+  document.getElementById('modal-sub').textContent   = s;
+  document.getElementById('modal-input').value       = '';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(function() { document.getElementById('modal-input').focus(); }, 80);
+}
+function closeModal()  { document.getElementById('modal-overlay').classList.remove('open'); }
+function askReset()    { document.getElementById('reset-overlay').classList.add('open'); }
+function closeReset()  { document.getElementById('reset-overlay').classList.remove('open'); }
+function confirmModal() {
+  var name = document.getElementById('modal-input').value.trim() || 'Participant 1';
+  closeModal(); doAssign(0, name);
+}
+function confirmReset() {
+  closeReset();
+  fetch('/api/session/reset', { method: 'POST' });
+}
+
+function doAssign(blockIdx, name) {
+  fetch('/api/block/assign', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ block_index: blockIdx, name: name })
+  }).then(function(r) { return r.json(); }).then(function(res) {
+    if (!res.success) { alert(res.error); }
+    else { selectedNextBlock = null; timerStart = Date.now(); startTimer(); }
+  });
+}
+
+function assignBlock() {
+  var name = '';
+  if (state.is_reuse_mode) {
+    name = document.getElementById('participant-select').value;
+    if (!name) { document.getElementById('participant-select').focus(); return; }
+  } else {
+    name = document.getElementById('next-part-name').value.trim();
+    if (!name) { document.getElementById('next-part-name').focus(); return; }
+  }
+  if (selectedNextBlock === null) { alert('Please select a block from the grid first.'); return; }
+  doAssign(selectedNextBlock, name);
+}
+
+function markDone() {
+  if (state.active_block === null || state.active_block === undefined) return;
+  fetch('/api/block/complete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ block_index: state.active_block })
+  }).then(function() { stopTimer(); });
+}
+
+function resetBlock() {
+  if (state.active_block === null || state.active_block === undefined) return;
+  fetch('/api/block/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ block_index: state.active_block })
+  }).then(function() { stopTimer(); });
+}
+
+function clickBlock(idx) {
+  if (!state.started || state.active_block !== null) return;
+  if (!state.blocks || state.blocks[idx].status !== 'available') return;
+  if (document.getElementById('next-block-area').style.display === 'none') return;
+  selectedNextBlock = idx;
+  document.getElementById('sel-badge').textContent    = 'Block ' + (idx + 1) + ' selected';
+  document.getElementById('sel-badge').style.display  = 'block';
+  document.getElementById('sel-hint').style.display   = 'none';
+  renderGrid();
+}
+
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(function() {
+    if (!timerStart) return;
+    var e  = Math.floor((Date.now() - timerStart) / 1000);
+    var el = document.getElementById('cb-timer');
+    if (el) el.textContent = pad(Math.floor(e / 60)) + ':' + pad(e % 60);
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); timerStart = null; }
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function renderMetrics() {
+  if (!state.started) return;
+  document.getElementById('m-p').textContent  = state.participants;
+  document.getElementById('m-b').textContent  = state.total;
+  document.getElementById('m-gs').textContent = state.cols + '×' + state.rows + ' grid';
+  document.getElementById('m-c').textContent  = state.completed;
+  document.getElementById('m-pr').textContent = state.progress + '%';
+}
+
+function renderGrid() {
+  var g = document.getElementById('block-grid');
+  if (!state.started || !state.blocks || !state.blocks.length) return;
+  g.style.gridTemplateColumns = 'repeat(' + state.cols + ', 1fr)';
+  g.innerHTML = state.blocks.map(function(b, i) {
+    var cls = 'block ', inner = '';
+    if (b.status === 'done') {
+      cls += 'block-done';
+      inner = '<div class="check-mark"><svg viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#FDFAF7" stroke-width="1.5" fill="none"/></svg></div>'
+            + '<span class="block-num" style="color:var(--sand-dark)">' + (i+1) + '</span>'
+            + '<span class="block-name">' + (b.sculptor || '') + '</span>';
+    } else if (b.status === 'sculpting') {
+      cls += 'block-sculpting';
+      inner = '<span class="block-num" style="color:var(--bg)">' + (i+1) + '</span>'
+            + '<span class="block-name" style="color:var(--clay-light)">' + (b.sculptor || '') + '</span>';
+    } else if (b.status === 'available') {
+      cls += (selectedNextBlock === i) ? 'block-selected' : 'block-available';
+      var tc = (selectedNextBlock === i) ? 'var(--clay-dark)' : 'var(--text)';
+      var sc = (selectedNextBlock === i) ? 'var(--clay-dark)' : 'var(--muted)';
+      inner = '<span class="block-num" style="color:' + tc + '">' + (i+1) + '</span>'
+            + '<span class="block-sub" style="color:' + sc + '">' + (selectedNextBlock === i ? 'selected' : 'tap') + '</span>';
+    } else {
+      cls += 'block-pending';
+      inner = '<span class="block-num" style="color:var(--hint)">' + (i+1) + '</span>';
+    }
+    return '<div class="' + cls + '" onclick="clickBlock(' + i + ')">' + inner + '</div>';
+  }).join('');
+}
+
+function renderCurrentBlock() {
+  var area = document.getElementById('current-block-area');
+  if (state.active_block === null || state.active_block === undefined) { area.style.display = 'none'; return; }
+  area.style.display = 'block';
+  var b = state.blocks[state.active_block];
+  document.getElementById('cb-name').textContent = b.name;
+  document.getElementById('cb-sub').textContent  = b.sculptor;
+  var sides = ['top','right','bottom','left'];
+  document.getElementById('edge-list').innerHTML = sides.map(function(s) {
+    var v   = b.edges[s];
+    var lbl = v === 'free' ? 'free' : v === 'conditioned' ? 'inherits neighbor' : 'pending';
+    var cls = v === 'conditioned' ? 'edge-badge edge-cond' : 'edge-badge edge-free';
+    return '<div class="edge-row"><span style="color:var(--muted)">' + s.charAt(0).toUpperCase() + s.slice(1) + ' edge</span><span class="' + cls + '">' + lbl + '</span></div>';
+  }).join('');
+}
+
+function renderNextPanel() {
+  var area = document.getElementById('next-block-area');
+  if (!state.started) { area.style.display = 'none'; return; }
+  var avail     = (state.blocks || []).filter(function(b) { return b.status === 'available'; }).length;
+  var remaining = (state.blocks || []).filter(function(b) { return b.status !== 'done'; }).length;
+  if (state.active_block !== null && state.active_block !== undefined) { area.style.display = 'none'; return; }
+  if (avail === 0 || remaining === 0) { area.style.display = 'none'; return; }
+  area.style.display = 'block';
+  if (state.is_reuse_mode) {
+    document.getElementById('new-participant-mode').style.display   = 'none';
+    document.getElementById('reuse-participant-mode').style.display = 'block';
+    var sel = document.getElementById('participant-select');
+    sel.innerHTML = '<option value="">Choose participant...</option>' +
+      (state.unique_participants || []).map(function(n) { return '<option value="' + n + '">' + n + '</option>'; }).join('');
+  } else {
+    document.getElementById('new-participant-mode').style.display   = 'block';
+    document.getElementById('reuse-participant-mode').style.display = 'none';
+    document.getElementById('next-part-name').value = '';
+  }
+  document.getElementById('sel-badge').style.display = 'none';
+  document.getElementById('sel-hint').style.display  = 'block';
+  selectedNextBlock = null;
+  renderGrid();
+}
+
+function renderParticipants() {
+  var el = document.getElementById('participant-list');
+  if (!state.participant_list || !state.participant_list.length) {
+    el.innerHTML = '<div class="empty">No participants yet</div>'; return;
+  }
+  var grouped = {};
+  state.participant_list.forEach(function(p) {
+    if (!grouped[p.name]) grouped[p.name] = { name: p.name, blocks: [], status: 'done' };
+    grouped[p.name].blocks.push(p.block_index + 1);
+    if (p.status === 'sculpting') grouped[p.name].status = 'sculpting';
+  });
+  el.innerHTML = Object.values(grouped).map(function(p) {
+    var ini  = p.name.split(' ').map(function(w) { return w[0]; }).join('').slice(0,2).toUpperCase();
+    var isSc = p.status === 'sculpting';
+    var avc  = isSc ? 'avatar av-active' : 'avatar av-done';
+    var bc   = isSc ? 'part-badge pb-sculpt' : 'part-badge pb-done';
+    var blks = p.blocks.map(function(b) { return 'B' + b; }).join(', ');
+    return '<div class="part-row"><div class="' + avc + '">' + ini + '</div>'
+         + '<div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">' + p.name + '</div>'
+         + '<div style="font-size:11px;color:var(--muted)">' + blks + '</div></div>'
+         + '<span class="' + bc + '">' + (isSc ? 'sculpting' : 'done') + '</span></div>';
+  }).join('');
+}
+
+function renderHistory() {
+  var el = document.getElementById('history-list');
+  if (!state.history || !state.history.length) {
+    el.innerHTML = '<div class="empty">No blocks completed yet</div>'; return;
+  }
+  el.innerHTML = state.history.map(function(h) {
+    return '<div class="hist-row">'
+         + '<div class="hist-num">' + h.block_name.replace('Block ','') + '</div>'
+         + '<div style="flex:1"><div style="font-weight:500;color:var(--text)">' + h.sculptor + '</div>'
+         + '<div style="color:var(--hint)">' + h.block_name + ' · ' + h.time + '</div></div></div>';
+  }).join('');
+}
+
+validateGrid();
+document.getElementById('modal-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') confirmModal(); });
+document.getElementById('next-part-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') assignBlock(); });
+</script>
+</body>
+</html>

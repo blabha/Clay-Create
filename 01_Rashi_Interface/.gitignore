@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Entornos / secretos
+.env
+*.log
+
+# Datos pesados / generados
+*.ply
+*.mp4
+
+# AI model weights
+*.safetensors

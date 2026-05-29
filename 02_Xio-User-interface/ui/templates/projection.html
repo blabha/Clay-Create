@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<title>Clay Create — Projection</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+<style>
+:root {
+  --bg:      #e8e2d8;
+  --bg-card: #ddd7cb;
+  --bg-col:  #d4cec4;
+  --border:  #c5bfb3;
+  --bl:      #bbb5aa;
+  --gold:    #8B6914;
+  --gold-lt: #9a7a3a;
+  --gold-mu: #b0a070;
+  --done:    #cc6633;
+  --off:     #b0aa9e;
+  --f: 'DM Sans', sans-serif;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100vw; height:100vh; overflow:hidden; background:var(--bg); font-family:var(--f); color:var(--gold); }
+
+/* 706×578 virtual canvas scaled to viewport */
+.canvas {
+  width: 706px; height: 578px;
+  position: absolute;
+  top: 0; left: 0;
+  transform: scale(var(--s,1));
+  transform-origin: top left;
+}
+
+/* ── header row 1: y=0, h=32 ── */
+.hdr1 {
+  position:absolute; left:0; top:0; width:706px; height:32px;
+  background:var(--bg-col);
+  border-bottom: 0.5px solid var(--bl);
+  display:flex;
+}
+
+.hcol {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 10px; font-size:8px; font-weight:600; letter-spacing:.07em;
+  border-right:0.5px solid var(--bl); height:100%;
+}
+.hcol:last-child { border-right:none; }
+/* col widths: 277 | 224 | 205 */
+.hcol:nth-child(1) { width:277px; }
+.hcol:nth-child(2) { width:224px; }
+.hcol:nth-child(3) { width:205px; }
+.hr { display:flex; align-items:center; gap:5px; font-weight:400; font-size:7px; }
+.dot { width:7px; height:7px; border-radius:50%; }
+.dot-g { background:var(--gold); }
+.dot-r { background:#cc4400; }
+
+/* ── header row 2: y=32, h=14 ── */
+.hdr2 {
+  position:absolute; left:0; top:32px; width:706px; height:14px;
+  border-bottom:0.5px solid var(--bl);
+  display:flex;
+}
+.hdr2-c {
+  display:flex; align-items:center;
+  padding:0 10px; font-size:7.5px; color:var(--gold-lt);
+  border-right:0.5px solid var(--bl);
+}
+.hdr2-c:last-child { border-right:none; }
+.hdr2-c:nth-child(1) { width:277px; }
+.hdr2-c:nth-child(2) { width:224px; }
+.hdr2-c:nth-child(3) { width:205px; }
+
+/* ── footer: y=540, h=38 ── */
+.footer {
+  position:absolute; left:0; top:540px; width:706px; height:38px;
+  border-top:0.5px solid var(--bl);
+  display:flex;
+}
+.fcol {
+  display:flex; align-items:center;
+  padding:0 10px;
+  border-right:0.5px solid var(--bl);
+}
+.fcol:last-child { border-right:none; }
+.fcol:nth-child(1) { width:277px; }
+.fcol:nth-child(2) { width:224px; }
+.fcol:nth-child(3) { width:205px; }
+
+/* ── col dividers (content area y=46..540) ── */
+.div1 { position:absolute; left:277px; top:46px; width:0.5px; height:494px; background:var(--bl); }
+.div2 { position:absolute; left:501px; top:46px; width:0.5px; height:494px; background:var(--bl); }
+
+/* ── COL 01 content ── */
+/* active card: x=8, y=52, w=261, h=110 */
+.active-card {
+  position:absolute; left:8px; top:52px; width:261px;
+  background:var(--bg-card); border:0.5px solid var(--border); border-radius:3px;
+  padding:8px 12px;
+}
+.bar { width:28px; height:2px; background:var(--gold); margin-bottom:6px; }
+.participant { font-size:13px; font-weight:600; color:var(--gold); min-height:16px; margin-bottom:3px; }
+.timer { font-size:32px; font-weight:700; letter-spacing:.04em; line-height:1; }
+.tlbl { font-size:7px; color:var(--gold-lt); margin-top:3px; margin-bottom:6px; }
+.prow { display:flex; align-items:baseline; justify-content:space-between; }
+.pv   { font-size:13px; font-weight:700; }
+.pl   { font-size:7px; color:var(--gold-lt); margin-left:3px; }
+.bc   { font-size:7px; color:var(--gold-lt); }
+
+/* grid label: below active card */
+.grid-lbl { position:absolute; left:8px; top:170px; font-size:7px; color:var(--gold-lt); }
+
+/* block grid: 150×150, bottom=141.9 from base (578)
+   content area bottom = 540. grid bottom from content bottom = 141.9-(578-540)=103.9
+   grid top = 540 - 103.9 - 150 = 286.1
+   grid centered in col01 (0..277): x=(277-150)/2=63.5 */
+.block-grid {
+  position:absolute;
+  left:63px; top:286px;
+  width:150px; height:150px;
+  display:grid; gap:3px;
+}
+.bcell {
+  background:var(--bg-col); border:0.5px solid var(--border); border-radius:2px;
+  display:flex; align-items:center; justify-content:center; font-size:11px;
+  transition: background .3s, color .3s;
+}
+.bcell.done      { background:var(--bg-card); color:var(--gold); }
+.bcell.sculpting { background:var(--gold);    color:var(--bg); }
+.bcell.available { color:var(--gold-mu); }
+.bcell.pending   { color:var(--off); }
+
+/* ── COL 02: tools panel + blueprint box ── */
+.tools-box {
+  position:absolute; left:299px; top:75px; width:180px; height:165px;
+  border:0.5px solid var(--border); border-radius:2px;
+  background:var(--bg-col);
+  padding:8px;
+  display:flex; flex-direction:column; gap:5px;
+  overflow-y:auto;
+}
+.bp-box {
+  position:absolute; left:299px; top:256px; width:180px; height:180px;
+  border:0.5px solid var(--border); border-radius:2px; overflow:hidden;
+  background:var(--bg-col);
+}
+.bp-box img { width:100%; height:100%; object-fit:cover; display:block; }
+.bp-no { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:8px; color:var(--off); }
+
+/* ── COL 03: sculpting guide + work area box ── */
+.guide-box {
+  position:absolute; left:513px; top:75px; width:180px; height:165px;
+  border:0.5px solid var(--border); border-radius:2px;
+  background:var(--bg-col);
+  padding:8px;
+  display:flex; flex-direction:column; gap:3px;
+  overflow-y:auto;
+}
+.wa-box {
+  position:absolute; left:513px; top:256px; width:180px; height:180px;
+  border:0.5px solid var(--border); border-radius:2px;
+  background:var(--bg-col);
+  overflow:hidden;
+}
+.instr-title {
+  font-size:6.5px; font-weight:700; color:var(--gold);
+  letter-spacing:.08em; margin-bottom:2px;
+  border-bottom:0.5px solid var(--border); padding-bottom:3px;
+  flex-shrink:0;
+}
+.instr-line { font-size:6.5px; color:var(--gold-lt); line-height:1.5; }
+
+/* ── footer col01: legend ── */
+.legend { display:flex; align-items:center; gap:10px; }
+.li { display:flex; align-items:center; gap:4px; font-size:7px; white-space:nowrap; }
+.ld { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.ld-s { background:var(--gold); }
+.ld-d { background:var(--done); }
+.ld-a { border:1px solid var(--gold); }
+.ld-p { border:1px solid var(--bl); }
+
+/* footer col02: grid info */
+.ginfo { display:flex; gap:14px; }
+.gi { display:flex; flex-direction:column; gap:1px; }
+.gi-l { font-size:7px; color:var(--gold-lt); }
+.gi-v { font-size:8px; font-weight:600; }
+
+/* footer col03: depth legend */
+.depth-legend { display:flex; flex-direction:column; gap:3px; width:100%; }
+.depth-bar { height:10px; border-radius:2px;
+  background: linear-gradient(to right, #008000, #aacc00, #ffff00, #ffaa00, #ff4400, #cc0000);
+}
+.depth-labels { display:flex; justify-content:space-between; font-size:6px; color:var(--gold-lt); }
+.depth-title { font-size:7px; color:var(--gold-lt); }
+</style>
+</head>
+<body>
+<div class="canvas" id="canvas">
+
+  <!-- header 1 -->
+  <div class="hdr1">
+    <div class="hcol">
+      <span>01&nbsp;&nbsp;GRID STATUS</span>
+      <div class="hr"><div class="dot dot-g"></div>LIVE</div>
+    </div>
+    <div class="hcol">
+      <span>02&nbsp;&nbsp;BLUEPRINT</span>
+      <div class="hr"><span id="sess-clk">00:00:00</span></div>
+    </div>
+    <div class="hcol">
+      <span>03&nbsp;&nbsp;WORK AREA</span>
+      <div class="hr"><div class="dot dot-r"></div><span id="blk-hdr">00:00</span></div>
+    </div>
+  </div>
+
+  <!-- header 2 -->
+  <div class="hdr2">
+    <div class="hdr2-c">ACTIVE BLOCK</div>
+    <div class="hdr2-c"></div>
+    <div class="hdr2-c"></div>
+  </div>
+
+  <!-- col dividers -->
+  <div class="div1"></div>
+  <div class="div2"></div>
+
+  <!-- col01: active card -->
+  <div class="active-card">
+    <div class="bar"></div>
+    <div class="participant" id="participant">—</div>
+    <div class="timer" id="timer">00:00</div>
+    <div class="tlbl">ELAPSED</div>
+    <div class="prow">
+      <div><span class="pv" id="pct">0%</span><span class="pl">COMPLETED</span></div>
+      <span class="bc" id="blk-ct">0 / 0</span>
+    </div>
+  </div>
+
+  <!-- col01: grid label -->
+  <div class="grid-lbl" id="grid-lbl">BLOCK GRID — 0 × 0</div>
+
+  <!-- col01: master heightmap with grid overlay -->
+  <canvas id="block-grid-canvas" width="522" height="522"
+    style="position:absolute;left:8px;top:231px;width:261px;height:261px;
+           border:0.5px solid var(--border);border-radius:2px;
+           image-rendering:pixelated;"></canvas>
+
+  <!-- col02: tools -->
+  <div class="tools-box">
+    <div class="instr-title">TOOLS</div>
+    <div class="instr-line"><span style="color:var(--gold)">01 · FLAT SPATULA</span> — removes and smooths large surface areas</div>
+    <div class="instr-line"><span style="color:var(--gold)">02 · LOOP TOOL</span> — excavates and hollows deeper zones</div>
+    <div class="instr-line"><span style="color:var(--gold)">03 · WIRE HOOK</span> — refines edges and medium depth areas</div>
+  </div>
+
+  <!-- col02: blueprint -->
+  <div class="bp-box">
+    <img src="/api/target-heatmap" alt="heightmap"
+         id="heightmap-img"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+    <div class="bp-no" style="display:none">NO IMAGE</div>
+  </div>
+
+  <!-- col03: sculpting guide -->
+  <div class="guide-box" id="guide-box">
+    <div class="instr-title">SCULPTING GUIDE</div>
+    <div class="instr-line" id="instr-content">—</div>
+  </div>
+
+  <!-- col03: work area -->
+  <div class="wa-box">
+    <img src="/static/progress.png" alt="progress"
+         id="progress-img"
+         style="width:100%;height:100%;object-fit:cover;display:block;border-radius:2px;"/>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <div class="fcol">
+      <div class="legend">
+        <div class="li"><div class="ld ld-s"></div>SCULPTING</div>
+        <div class="li"><div class="ld ld-d"></div>DONE</div>
+        <div class="li"><div class="ld ld-a"></div>AVAILABLE</div>
+        <div class="li"><div class="ld ld-p"></div>PENDING</div>
+      </div>
+    </div>
+    <div class="fcol">
+      <div class="ginfo">
+        <div class="gi"><span class="gi-l">Grid</span><span class="gi-v" id="i-grid">3 × 3</span></div>
+        <div class="gi"><span class="gi-l">Tile</span><span class="gi-v" id="i-tile">150 mm</span></div>
+        <div class="gi"><span class="gi-l">Depth</span><span class="gi-v" id="i-depth">30 mm</span></div>
+      </div>
+    </div>
+    <div class="fcol">
+      <div class="depth-legend">
+        <div class="depth-title">DEPTH LEGEND</div>
+        <div class="depth-bar"></div>
+        <div class="depth-labels"><span>DEEP</span><span>SHALLOW</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+  function scale() {
+    const sx = window.innerWidth  / 706;
+    const sy = window.innerHeight / 578;
+    const s  = Math.min(sx, sy);
+    const c  = document.getElementById('canvas');
+    c.style.setProperty('--s', s);
+    c.style.left = ((window.innerWidth  - 706 * s) / 2) + 'px';
+    c.style.top  = ((window.innerHeight - 578 * s) / 2) + 'px';
+  }
+  scale(); window.addEventListener('resize', scale);
+
+  const socket = io();
+  let gridState   = { cols: 0, rows: 0, blocks: [] };
+  let hmImage     = null;
+  let timerStart  = null;   // set when AI backend first shows initialized
+  let timerTick   = 0;
+
+  // ── local 1-second timer driven by AI state ──────────────────────────
+  setInterval(() => {
+    if (!timerStart) return;
+    timerTick = Math.floor((Date.now() - timerStart) / 1000);
+    document.getElementById('timer').textContent    = fmt(timerTick);
+    document.getElementById('blk-hdr').textContent  = fmt(timerTick);
+    document.getElementById('sess-clk').textContent = fmtH(timerTick);
+  }, 1000);
+
+  // ── AI generation backend state (grid + tile status) ─────────────────
+  function loadAIState() {
+    fetch('/api/ai-state')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.initialized || !d.cols || !d.rows) return;
+
+        // Start timer the first time we see an active or completed tile
+        if (!timerStart && (d.completed.length > 0 || d.current_tile >= 0)) {
+          timerStart = Date.now();
+        }
+
+        const n = d.cols * d.rows;
+        const blocks = Array.from({ length: n }, (_, i) => ({
+          status: d.completed.includes(i) ? 'done'
+                : (i === d.current_tile   ? 'sculpting' : 'pending')
+        }));
+
+        gridState = { cols: d.cols, rows: d.rows, blocks };
+        resizeCanvas();
+
+        const done = d.completed.length;
+        const pct  = Math.round(done / n * 100);
+        document.getElementById('grid-lbl').textContent = `BLOCK GRID — ${d.cols} × ${d.rows}`;
+        document.getElementById('i-grid').textContent   = `${d.cols} × ${d.rows}`;
+        document.getElementById('pct').textContent      = pct + '%';
+        document.getElementById('blk-ct').textContent   = done + ' / ' + n;
+        document.getElementById('participant').textContent =
+          d.current_tile >= 0 ? `TILE ${d.current_tile + 1}` : '—';
+
+        drawCanvas();
+      })
+      .catch(() => {});
+  }
+
+  // ── resize canvas to fill available col01 space; tiles scale to fit ──
+  function resizeCanvas() {
+    const { cols, rows } = gridState;
+    if (!cols || !rows) return;
+    const canvas = document.getElementById('block-grid-canvas');
+    const RES = 2;
+    // Available in col01: x=8..269 (261px wide), y=193..535 (342px tall)
+    const maxW = 261, maxH = 342;
+    // Fit square tiles; whichever axis is more constrained sets the tile size
+    const tCell = Math.floor(Math.min(maxW / cols, maxH / rows));
+    const cssW  = cols * tCell;
+    const cssH  = rows * tCell;
+    canvas.width  = cssW * RES;
+    canvas.height = cssH * RES;
+    canvas.style.width  = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    // centre horizontally in col01; vertically align centre with bp-box/wa-box (centre = 256+90 = 346px)
+    canvas.style.left = Math.floor((277 - cssW) / 2) + 'px';
+    canvas.style.top  = Math.floor(346 - cssH / 2) + 'px';
+  }
+
+  // ── canvas: heightmap + grid overlay ─────────────────────────────────
+  function drawCanvas() {
+    const canvas = document.getElementById('block-grid-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    ctx.fillStyle = '#e8e2d8';
+    ctx.fillRect(0, 0, W, H);
+
+    const { cols, rows, blocks } = gridState;
+    if (!cols || !rows) return;
+
+    // canvas is sized to cols*tSize × rows*tSize by resizeCanvas()
+    const tSize = Math.round(W / cols);
+
+    if (hmImage) {
+      ctx.drawImage(hmImage, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#d4cec4';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (!blocks.length) return;
+
+    blocks.forEach((b, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x   = col * tSize;
+      const y   = row * tSize;
+      const st  = b.status;
+
+      if (st === 'done') {
+        ctx.fillStyle = 'rgba(107,158,112,0.45)';
+        ctx.fillRect(x, y, tSize, tSize);
+      }
+
+      // grid lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, tSize - 1, tSize - 1);
+
+      // active tile: orange border
+      if (st === 'sculpting') {
+        ctx.strokeStyle = '#B87050';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 1.5, y + 1.5, tSize - 3, tSize - 3);
+      }
+
+      // tile number
+      const fs = Math.max(8, Math.round(tSize * 0.22));
+      ctx.font = `600 ${fs}px DM Sans, sans-serif`;
+      ctx.fillStyle = st === 'done' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.65)';
+      ctx.fillText(i + 1, x + 4, y + fs + 3);
+    });
+  }
+
+  function loadHeightmap() {
+    const img = new Image();
+    img.onload  = () => { hmImage = img; drawCanvas(); };
+    img.onerror = () => { drawCanvas(); };
+    img.src = '/api/ai-heightmap?t=' + Date.now();
+  }
+
+  function fmt(s)  { return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+  function fmtH(s) { return String(Math.floor(s/3600)).padStart(2,'0')+':'+fmt(s%3600); }
+
+  loadHeightmap();
+  setInterval(loadHeightmap, 5000);
+  loadAIState();
+  setInterval(loadAIState, 3000);
+
+  // ── Socket: sculpting instructions ───────────────────────────────────
+  socket.on('instructions_update', d => {
+    if (!d || !d.instructions) return;
+    const content = document.getElementById('instr-content');
+    if (content) content.innerHTML = d.instructions
+      .map(line => `<span>${line}</span><br>`).join('');
+  });
+
+  // ── Socket: new images saved (trigger.txt changed) ───────────────────
+  socket.on('image_update', () => {
+    const prog = document.getElementById('progress-img');
+    if (prog) { prog.src = '/api/progress-heatmap?t=' + Date.now(); prog.style.display = 'block'; }
+    const hmap = document.getElementById('heightmap-img');
+    if (hmap) { hmap.src = '/api/target-heatmap?t=' + Date.now(); hmap.style.display = 'block'; }
+  });
+
+  socket.emit('request_state');
+</script>
+</body>
+</html>
