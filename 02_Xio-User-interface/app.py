@@ -87,7 +87,7 @@ def ai_heightmap():
 
 @app.route('/api/target-heatmap')
 def target_heatmap():
-    path = r'C:\Users\Bhavana\Documents\Hardware 3\z_Target heatmap_Colour_PNG_Output\target_heatmap.png'
+    path = r'C:\Users\Bhavana\Documents\Hardware 3\z_Target heat_PNG_Outpumap_Colourt\target_heatmap.png'
     if not os.path.exists(path):
         return Response(status=404)
     with open(path, 'rb') as f:
@@ -170,7 +170,7 @@ def reset_session():
 
 # ─── TARGET DESIGN ARCHIVE ────────────────────────────────────────────────────
 _WORKSPACE          = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_TARGET_CURRENT_DIR = os.path.join(_WORKSPACE, "z_Target heatmap_Colour_PNG_Output")
+_TARGET_CURRENT_DIR = os.path.join(_WORKSPACE, "z_Target heat_PNG_Outpumap_Colourt")
 _TARGET_DONE_DIR    = os.path.join(_WORKSPACE, "z_Completed Target Design")
 _TARGET_FILE        = os.path.join(_TARGET_CURRENT_DIR, "target_heatmap.png")
 
@@ -220,10 +220,9 @@ def send_to_grasshopper(payload):
     threading.Thread(target=_gh_send_worker, args=(payload,), daemon=True).start()
 
 # ─── TRIGGER FILE WATCHER (emits image_update when either heatmap changes) ─────
-_HEATMAP_DIR = r"C:\Users\Bhavana\Documents\Hardware 3\z_Target heatmap_Colour_PNG_Output"
 WATCH_FILES = [
-    os.path.join(_HEATMAP_DIR, "target_heatmap.png"),
-    os.path.join(_HEATMAP_DIR, "progress_heatmap.png"),
+    r"C:\Users\Bhavana\Documents\Hardware 3\z_Target heat_PNG_Outpumap_Colourt\target_heatmap.png",
+    r"C:\Users\Bhavana\Documents\Hardware 3\z_Target heatmap_Colour_PNG_Output\progress_heatmap.png",
 ]
 
 def trigger_watcher():

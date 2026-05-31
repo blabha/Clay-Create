@@ -160,6 +160,7 @@ def _archive_heatmap(roi, color_bgr, timestamp):
         print(f"[Heatmap] Archived -> {dest}")
     # Always write fresh capture so the next cycle has a file to archive
     capture = color_bgr[roi[1]:roi[1]+roi[3], roi[0]:roi[0]+roi[2]] if roi is not None else color_bgr
+    capture = cv2.flip(capture, 1)  # flip along vertical axis (left-right mirror)
     os.makedirs(os.path.dirname(CURRENT_HEATMAP), exist_ok=True)
     cv2.imwrite(CURRENT_HEATMAP, capture)
     print(f"[Heatmap] Captured -> {CURRENT_HEATMAP}")
