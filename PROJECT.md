@@ -28,15 +28,15 @@ iPad / Orbbec camera
                                │
         ┌──────────────────────┘
         ▼
-01_Rashi_Interface  (AI depth pipeline)        http://localhost:5173
-02_Xio-User-interface  (projection server)     http://localhost:5000/projection
+01_Innitialization_Backend_UI  (AI depth pipeline)        http://localhost:5173
+02_Projected_UI  (projection server)     http://localhost:5000/projection
 ```
 
 ---
 
 ## Modules
 
-### 01_Rashi_Interface — AI Design Pipeline
+### 01_Innitialization_Backend_UI — AI Design Pipeline
 FastAPI backend + Vite/React frontend.
 
 | Component | Description |
@@ -61,16 +61,16 @@ FastAPI backend + Vite/React frontend.
 
 **Start:**
 ```
-cd 01_Rashi_Interface/AI-generation/backend
+cd 01_Innitialization_Backend_UI/AI-generation/backend
 venv\Scripts\python -m uvicorn main:app --port 8001
 
-cd 01_Rashi_Interface/AI-generation/frontend
+cd 01_Innitialization_Backend_UI/AI-generation/frontend
 npm run dev
 ```
 
 ---
 
-### 02_Xio-User-interface — Projection Interface
+### 02_Projected_UI — Projection Interface
 Flask + SocketIO server serving the projector HTML.
 
 | File | Description |
@@ -92,7 +92,7 @@ Flask + SocketIO server serving the projector HTML.
 
 **Start:**
 ```
-cd 02_Xio-User-interface
+cd 02_Projected_UI
 python app.py
 ```
 
@@ -189,15 +189,15 @@ Output: `z_Current Point Cloud_Mesh/current_mesh.obj` (150×150×30 mm)
 04_Point cloud\batch files\scan.bat
 
 # 2. Start Rashi AI backend
-cd 01_Rashi_Interface\AI-generation\backend
+cd 01_Innitialization_Backend_UI\AI-generation\backend
 venv\Scripts\python -m uvicorn main:app --port 8001
 
 # 3. Start Rashi frontend
-cd 01_Rashi_Interface\AI-generation\frontend
+cd 01_Innitialization_Backend_UI\AI-generation\frontend
 npm run dev
 
 # 4. Start Xio projection server
-cd 02_Xio-User-interface
+cd 02_Projected_UI
 python app.py
 
 # 5. Open projection in browser
@@ -216,7 +216,7 @@ http://localhost:5000/pointcloud-viewer
 |---|---|
 | Python 3.14 (system default) | `scan.bat`, `capture_grey_block.py`, Orbbec capture |
 | Python 3.11 (`pythoncore-3.11-64`) | `ipad_stream.py` (MediaPipe, Open3D, OpenNI2) |
-| Rashi venv (`01_Rashi_Interface/AI-generation/backend/venv`) | FastAPI + MiDaS backend |
+| Rashi venv (`01_Innitialization_Backend_UI/AI-generation/backend/venv`) | FastAPI + MiDaS backend |
 
 **Install 3.11 dependencies:**
 ```

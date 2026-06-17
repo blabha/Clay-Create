@@ -26,14 +26,14 @@ Orbbec Astra Camera
         └──► z_Current Heatmap_PNG / current_heatmap.png
                        │
                        ▼
-01_Rashi_Interface                       ← AI depth pipeline (FastAPI + React)
+01_Innitialization_Backend_UI                       ← AI depth pipeline (FastAPI + React)
   MiDaS depth estimation
   Tile adaptation via harmonic interpolation
   → z_Target heat_PNG_Outpumap_Colourt / target_heatmap.png
   → z_Target heatmap_Colour_PNG_Output / progress_heatmap.png
                        │
                        ▼
-02_Xio-User-interface                    ← projection server (Flask + SocketIO)
+02_Projected_UI                    ← projection server (Flask + SocketIO)
   Live projection at http://localhost:5000/projection
   Auto-refresh via WebSocket on file change
 ```
@@ -135,15 +135,15 @@ mkdir "z_Completed Target Design"
 04_Point cloud\batch files\scan.bat
 
 # 2. Start Rashi AI backend
-cd 01_Rashi_Interface\AI-generation\backend
+cd 01_Innitialization_Backend_UI\AI-generation\backend
 venv\Scripts\python -m uvicorn main:app --port 8001
 
 # 3. Start Rashi frontend
-cd 01_Rashi_Interface\AI-generation\frontend
+cd 01_Innitialization_Backend_UI\AI-generation\frontend
 npm run dev
 
 # 4. Start Xio projection server
-cd 02_Xio-User-interface
+cd 02_Projected_UI
 python app.py
 
 # 5. Open projection in browser
@@ -169,7 +169,7 @@ py -3.11 "03_Hands recognition\ipad_stream.py"
 |---|---|
 | **Python 3.14** (system default) | `scan.bat`, all `04_Point cloud` scripts |
 | **Python 3.11** (`pythoncore-3.11-64`) | `ipad_stream.py` (MediaPipe + OpenNI2) |
-| **Rashi venv** (`01_Rashi_Interface/AI-generation/backend/venv`) | FastAPI + MiDaS |
+| **Rashi venv** (`01_Innitialization_Backend_UI/AI-generation/backend/venv`) | FastAPI + MiDaS |
 
 ### Install Python 3.11 dependencies (hands monitor)
 
@@ -180,7 +180,7 @@ py -3.11 -m pip install -r "03_Hands recognition\requirements.txt"
 ### Install Rashi backend dependencies
 
 ```bat
-cd 01_Rashi_Interface\AI-generation\backend
+cd 01_Innitialization_Backend_UI\AI-generation\backend
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt
 
@@ -194,7 +194,7 @@ venv\Scripts\pip install torch torchvision --index-url https://download.pytorch.
 ### Install Xio server dependencies
 
 ```bat
-cd 02_Xio-User-interface
+cd 02_Projected_UI
 pip install -r requirements.txt
 ```
 
@@ -218,7 +218,7 @@ set ASTRA_SDK_BIN=<path-to-AstraSDK>\bin
 ### Rashi frontend
 
 ```bat
-cd 01_Rashi_Interface\AI-generation\frontend
+cd 01_Innitialization_Backend_UI\AI-generation\frontend
 npm install
 ```
 
@@ -274,7 +274,7 @@ Grasshopper can also send and receive session state over UDP:
 | Parameter | Value | Where to change |
 |---|---|---|
 | Hand absence timeout | 5 seconds | `03_Hands recognition/ipad_stream.py` → `HANDS_TIMEOUT` |
-| Clay block size | 15 × 15 × 3 cm | `01_Rashi_Interface/AI-generation/backend` — exporter |
+| Clay block size | 15 × 15 × 3 cm | `01_Innitialization_Backend_UI/AI-generation/backend` — exporter |
 | Tile size | 256 × 256 px | `tile_manager.py` |
 | MiDaS weight | 80% depth + 20% luminance | `main.py` → `enhance_heightmap` |
 | Orbbec resolution | 640 × 480 @ 30 fps | `ipad_stream.py` → stream setup |

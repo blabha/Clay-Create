@@ -1,0 +1,87 @@
+# Clay Create — Hardware 3
+# ============================================================
+# This project uses THREE separate Python environments.
+# Install each block into the correct environment as shown.
+# ============================================================
+
+
+# ── 1. Orbbec Capture + Point Cloud (Python 3.14 — system default) ────────────
+#
+#   cd "04_Point cloud"
+#   pip install -r requirements.txt
+#
+#   OR install the lines below directly:
+#
+numpy
+opencv-python
+openni
+plotly
+scipy
+scikit-learn
+matplotlib
+
+
+# ── 2. Hand Detection Monitor (Python 3.11 — REQUIRED, mediapipe not on 3.14) ─
+#
+#   py -3.11 -m pip install -r "03_Hands recognition\requirements.txt"
+#
+#   OR install the lines below directly:
+#
+#   py -3.11 -m pip install mediapipe==0.10.9 opencv-python numpy openni open3d
+#
+# mediapipe==0.10.9   ← version-pinned: newer versions removed the solutions API
+# opencv-python>=4.8.0
+# numpy>=1.26.0
+# openni>=2.3.0
+# open3d>=0.18.0
+
+
+# ── 3. Rashi AI Backend (dedicated venv inside 01_Innitialization_Backend_UI) ─────────────
+#
+#   cd 01_Innitialization_Backend_UI\AI-generation\backend
+#   python -m venv venv
+#   venv\Scripts\pip install -r requirements.txt
+#
+#   PyTorch — install separately BEFORE the requirements file:
+#     CPU only:   venv\Scripts\pip install torch torchvision
+#     CUDA 12.4:  venv\Scripts\pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+#
+# torch>=2.2.0
+# torchvision>=0.17.0
+# timm>=0.9.16
+# fastapi>=0.111.0
+# uvicorn[standard]>=0.29.0
+# python-multipart>=0.0.9
+# opencv-python-headless>=4.8.0
+# Pillow>=10.3.0
+# numpy>=1.26.0
+# scipy>=1.13.0
+# matplotlib>=3.8.0
+
+
+# ── 4. Xio Projection Server (system Python or any env with Flask) ─────────────
+#
+#   cd 02_Projected_UI
+#   pip install -r requirements.txt
+#
+# flask
+# flask-socketio>=5.4.0
+# python-socketio>=5.11.0
+# python-engineio>=4.9.0
+
+
+# ── 5. Orbbec Astra SDK (not a pip package) ────────────────────────────────────
+#
+#   Download AstraSDK-v2.1.3 from the Orbbec website and install it.
+#   Then set the environment variable so all scripts can find it:
+#
+#     set ASTRA_SDK_BIN=<path-to-AstraSDK>\bin
+#
+#   If ASTRA_SDK_BIN is not set, scripts will attempt auto-detection.
+
+
+# ── 6. Frontend (Node.js — not pip) ───────────────────────────────────────────
+#
+#   cd 01_Innitialization_Backend_UI\AI-generation\frontend
+#   npm install
+#   npm run dev
