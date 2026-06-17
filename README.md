@@ -87,6 +87,29 @@ python mesh.py --input <file.ply> --output <file.obj>
 
 ---
 
+## Required Data Folders
+
+These folders are **not included in the repository** (they are gitignored because they hold large scan data). You must create them before running the system for the first time, otherwise scripts will error when trying to write output files.
+
+Run this once after cloning:
+
+```bat
+mkdir "z_Current Point cloud"
+mkdir "z_History Point Cloud"
+mkdir "z_Current Heatmap_PNG"
+mkdir "z_History Heatmap_PNG"
+mkdir "z_Current Point Cloud_Mesh"
+mkdir "z_History Point Cloud_Mesh"
+mkdir "z_Target heat_PNG_Outpumap_Colourt"
+mkdir "z_Target heatmap_Colour_PNG_Output"
+mkdir "z_CurrentTargetDesign"
+mkdir "z_Completed Target Design"
+```
+
+> The scripts will also create these automatically via `os.makedirs(..., exist_ok=True)` in most cases, but creating them upfront avoids any permission or timing issues on first run.
+
+---
+
 ## File Storage
 
 | Folder | File | Written by |
