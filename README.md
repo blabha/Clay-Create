@@ -307,5 +307,5 @@ Live endpoint: `http://localhost:5000/api/progress-heatmap`
 
 ```
 https://github.com/blabha/Clay-Create
-Branch: Bhavana_Main
+Branch: Main
 ```
