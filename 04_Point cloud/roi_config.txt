@@ -1,0 +1,10 @@
+x_min=3.97
+x_max=20.02
+z_min=-12.37
+z_max=3.57
+depth_min=48.90
+depth_max=52.40
+roi_u0=383
+roi_v0=208
+roi_u1=540
+roi_v1=365
