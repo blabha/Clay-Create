@@ -2,86 +2,123 @@
 
 **MRAC01 Hardware III Workshop · IAAC Barcelona**
 
-A co-creative fabrication system where participants sculpt clay blocks that together form a large wall relief. An Orbbec depth camera scans each block; AI adapts the remaining tile designs to keep the full wall visually continuous with what was actually carved.
+A co-creative fabrication system where workshop participants each sculpt one clay block that together form a large wall relief. A depth camera scans each block after carving; AI adapts all remaining tile designs automatically to keep the full wall visually continuous.
+
+---
+
+## Hardware Requirements
+
+Before anything else, make sure you have:
+
+| Hardware | Purpose |
+|---|---|
+| **Orbbec Astra depth camera** | Captures point clouds and RGB frames during scanning and hand monitoring |
+| **Orbbec AstraSDK v2.1.3** | Driver/runtime required to communicate with the camera — download from the Orbbec website |
+| **Projector** | Pointed at the clay wall — displays the target carving design and progress heatmap during each participant's turn |
+| **Windows PC** | All scripts are Windows-native (batch files, Python on Windows paths) |
+
+Set the SDK path once so all scripts can find it:
+
+```bat
+set ASTRA_SDK_BIN=<path-to-AstraSDK>\bin
+```
+
+---
+
+## How the System Works
+
+The wall is divided into a **grid of tiles** (e.g. 3 × 2 = 6 blocks). Each participant is assigned one block to carve in clay. The AI generates a unique heightmap target for each block based on a reference image, ensuring the carvings will connect visually across the full wall when assembled.
+
+**One participant's turn looks like this:**
+1. Their target design is projected onto the wall by the projector
+2. They begin carving the clay block by hand
+3. Every time they step back for 5 seconds, the camera scans the current state
+4. A progress heatmap is projected showing how close the current carve is to the target
+5. When finished, the scan is logged and the next participant begins
+
+The AI continuously updates the remaining uncarved tiles based on what was actually carved — so each block adapts to the real outcomes of the ones before it.
 
 ---
 
 ## System Architecture
 
 ```
-Orbbec Astra Camera
+► START HERE: 04_Point cloud/batch files/scan.bat
+        │
+        │  Step 1 — live_roi.py
+        │    Draw a rectangle around the clay block area
+        │    → saves roi_config.txt (bounding box for all future scans)
+        │
+        │  Step 2 — capture_grey_block.py
+        │    Captures the first point cloud + RGB image
+        │    → z_Current Point cloud/current_pointcloud.ply
+        │    → z_Current Heatmap_PNG/current_heatmap.png
+        │
+        │  Step 3 — launches ipad_stream.py in background
+        │    Hand detection now runs continuously
+        │    Hands absent 5s → auto-scan → repeat until session ends
         │
         ▼
-03_Hands recognition / ipad_stream.py   ← background process (Python 3.11)
-  MediaPipe hand detection
-  5-second absence → archive heatmap + trigger scan
+01_Innitialization_Backend_UI   ← AI pipeline (FastAPI + React, port 8001/5173)
+  Upload reference image + set grid (cols × rows)
+  MiDaS generates per-tile depth heightmaps
+  After each scan: adapts uncarved neighbours automatically
         │
-        ▼
-04_Point cloud / scan.bat               ← main scan workflow (Python 3.14)
-  Step 1 · live_roi.py        → draw ROI, save roi_config.txt
-  Step 2 · capture_grey_block.py → capture point cloud + RGB
-  Step 3 · launch ipad_stream.py in background
+        ▼ writes heatmap PNGs
         │
-        ├──► z_Current Point cloud / current_pointcloud.ply
-        └──► z_Current Heatmap_PNG / current_heatmap.png
-                       │
-                       ▼
-01_Innitialization_Backend_UI                       ← AI depth pipeline (FastAPI + React)
-  MiDaS depth estimation
-  Tile adaptation via harmonic interpolation
-  → z_Target heat_PNG_Outpumap_Colourt / target_heatmap.png
-  → z_Target heatmap_Colour_PNG_Output / progress_heatmap.png
-                       │
-                       ▼
-02_Projected_UI                    ← projection server (Flask + SocketIO)
-  Live projection at http://localhost:5000/projection
-  Auto-refresh via WebSocket on file change
+02_Projected_UI                 ← projection server (Flask, port 5000)
+  Serves target + progress heatmaps to the projector
+  Auto-refreshes via WebSocket when files change
+  Receives grid/geometry updates from Grasshopper over UDP
 ```
 
 ---
 
 ## Modules
 
-### 01 · Rashi Interface — AI Design Pipeline
-FastAPI backend + Vite/React frontend.
+### 01_Innitialization_Backend_UI — AI Design Pipeline
+FastAPI backend + Vite/React frontend. This is where you set up the session before carving begins.
 
-- Uploads a reference image + wall dimensions
-- MiDaS depth (80%) + luminance detail (20%) → per-tile heightmaps
-- After each scan: harmonic interpolation adapts uncarved neighbours automatically
+- Upload a reference image and set the wall grid dimensions (cols × rows)
+- MiDaS depth model (80% weight) + luminance detail (20%) → per-tile heightmaps
+- Each tile gets a unique 256 × 256 px target depth map
+- After every scan: harmonic interpolation automatically updates all uncarved neighbours to maintain visual continuity
 
 **Ports:** Backend `8001` · Frontend `5173`
 
-### 02 · Xio User Interface — Projection Server
-Flask + SocketIO server driving the projector display.
+### 02_Projected_UI — Projection Server
+Flask + SocketIO server that drives the projector display during the workshop.
 
-- `/projection` — main projector view
-- `/pointcloud-viewer` — live Three.js point cloud viewer
-- `/api/target-heatmap`, `/api/progress-heatmap` — file-based image endpoints
-- Polls heatmap files every 1 second; WebSocket push on change
+- `/projection` — the main display, shown on the projector pointed at the wall
+- `/pointcloud-viewer` — live Three.js viewer for the latest scan
+- `/api/target-heatmap`, `/api/progress-heatmap` — image endpoints polled every 1 second
+- WebSocket push refreshes the projection instantly when either heatmap file changes
 
 **Port:** `5000`
 
-### 03 · Hands Recognition — Background Monitor
-Orbbec colour stream + MediaPipe. Launched by `scan.bat` after initial capture.
+### 03_Hands Recognition — Background Scan Monitor
+Orbbec colour stream + MediaPipe hand detection. Launched automatically by `scan.bat` — you do not start this manually.
 
-- Loads ROI from `04_Point cloud/roi_config.txt` on startup
-- Hand absent ≥ 5 seconds → archives current heatmap + fires new scan
-- Releases Orbbec before scan subprocess runs, reclaims after
+- Watches for hands leaving the ROI area
+- Hand absent ≥ 5 seconds → archives current heatmap → triggers new scan → repeats
+- Releases the Orbbec camera before the scan subprocess runs, reclaims it after
+- Loops indefinitely until the session ends (Ctrl+C to stop)
 
-**Requires Python 3.11**
+**Requires Python 3.11** (MediaPipe is not compatible with Python 3.14)
 
-### 04 · Point Cloud — Orbbec Capture Pipeline
-`scan.bat` runs three steps in sequence:
-1. `live_roi.py` — draw bounding box → `roi_config.txt`
-2. `capture_grey_block.py` — capture foreground point cloud + RGB
-3. Launch `ipad_stream.py` in background window
+### 04_Point Cloud — Orbbec Capture Pipeline
+**Entry point for every session.** Run `scan.bat` to begin.
 
-Point cloud output: Y-flipped + rotated 90° CW (camera space → world space)
+1. `live_roi.py` — draw a bounding box around the block area; saves `roi_config.txt`
+2. `capture_grey_block.py` — capture foreground point cloud + RGB within the ROI
+3. Launches `ipad_stream.py` (hand monitor) in a background window
 
-### 05 · PointCloud to Mesh
-Open3D Poisson reconstruction.
+Point cloud output: Y-flipped + rotated 90° CW to convert from camera space to world space.
 
-```
+### 05_PointCloud to Mesh
+Optional. Converts a point cloud to a surface mesh via Open3D Poisson reconstruction.
+
+```bat
 python mesh.py --input <file.ply> --output <file.obj>
 ```
 
@@ -89,9 +126,7 @@ python mesh.py --input <file.ply> --output <file.obj>
 
 ## Required Data Folders
 
-These folders are **not included in the repository** (they are gitignored because they hold large scan data). You must create them before running the system for the first time, otherwise scripts will error when trying to write output files.
-
-Run this once after cloning:
+These folders are **not included in the repository** (gitignored — they hold large scan data). Create them once after cloning:
 
 ```bat
 mkdir "z_Current Point cloud"
@@ -106,7 +141,91 @@ mkdir "z_CurrentTargetDesign"
 mkdir "z_Completed Target Design"
 ```
 
-> The scripts will also create these automatically via `os.makedirs(..., exist_ok=True)` in most cases, but creating them upfront avoids any permission or timing issues on first run.
+---
+
+## Installation
+
+### Python environments
+
+This project requires **two separate Python versions** — do not mix them:
+
+| Environment | Version | Used by |
+|---|---|---|
+| System Python | **3.14** | `scan.bat`, all `04_Point cloud` capture scripts |
+| Secondary Python | **3.11** | `ipad_stream.py` — MediaPipe does not support 3.14 |
+| Rashi venv | **3.x** (inside venv) | `01_Innitialization_Backend_UI` AI backend |
+
+### 1. Point cloud capture (Python 3.14)
+
+```bat
+cd "04_Point cloud"
+pip install -r requirements.txt
+```
+
+### 2. Hand detection monitor (Python 3.11 — must be installed separately)
+
+```bat
+py -3.11 -m pip install -r "03_Hands recognition\requirements.txt"
+```
+
+> `mediapipe==0.10.9` is version-pinned — newer versions removed the `solutions` API that this project uses.
+
+### 3. AI backend (dedicated venv)
+
+```bat
+cd 01_Innitialization_Backend_UI\AI-generation\backend
+python -m venv venv
+
+rem PyTorch — install FIRST, before requirements.txt
+rem CPU only:
+venv\Scripts\pip install torch torchvision
+rem CUDA 12.4:
+venv\Scripts\pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+
+venv\Scripts\pip install -r requirements.txt
+```
+
+### 4. Projection server (Python 3.14 or any env with Flask)
+
+```bat
+cd 02_Projected_UI
+pip install -r requirements.txt
+```
+
+### 5. AI frontend (Node.js)
+
+```bat
+cd 01_Innitialization_Backend_UI\AI-generation\frontend
+npm install
+```
+
+---
+
+## Quick Start
+
+Run these in order at the start of each workshop session:
+
+```bat
+rem ── Terminal 1: run the scan + launch hand monitor ──
+"04_Point cloud\batch files\scan.bat"
+
+rem ── Terminal 2: AI backend ──
+cd 01_Innitialization_Backend_UI\AI-generation\backend
+venv\Scripts\python -m uvicorn main:app --port 8001
+
+rem ── Terminal 3: AI frontend ──
+cd 01_Innitialization_Backend_UI\AI-generation\frontend
+npm run dev
+
+rem ── Terminal 4: projection server ──
+cd 02_Projected_UI
+python app.py
+```
+
+Then open in browser:
+- **AI design interface** → `http://localhost:5173` — upload image, set grid, assign blocks
+- **Projector display** → `http://localhost:5000/projection` — open this on the projector screen
+- **Point cloud viewer** → `http://localhost:5000/pointcloud-viewer`
 
 ---
 
@@ -116,156 +235,50 @@ mkdir "z_Completed Target Design"
 |---|---|---|
 | `z_Current Point cloud/` | `current_pointcloud.ply` | `detect_grey_block.py` |
 | `z_History Point Cloud/` | `pointcloud_YYYYMMDD_HHMMSS.ply` | `detect_grey_block.py` |
-| `z_Current Heatmap_PNG/` | `current_heatmap.png` | `ipad_stream.py` / `detect_grey_block.py` |
+| `z_Current Heatmap_PNG/` | `current_heatmap.png` | `ipad_stream.py` + `detect_grey_block.py` |
 | `z_History Heatmap_PNG/` | `heatmap_YYYYMMDD_HHMMSS.png` | `ipad_stream.py` |
 | `z_Current Point Cloud_Mesh/` | `current_mesh.obj` | `mesh.py` |
-| `z_Target heat_PNG_Outpumap_Colourt/` | `target_heatmap.png` | Rashi backend |
-| `z_Target heatmap_Colour_PNG_Output/` | `progress_heatmap.png` | Rashi backend |
-| `z_CurrentTargetDesign/` | `current_target.jpg` | `app.py` (on block assign) |
-| `z_Completed Target Design/` | `target_YYYYMMDD.jpg` | `app.py` (on block assign) |
-
----
-
-## Quick Start
-
-### Full session (run in order)
-
-```bat
-# 1. Scan first block + launch hand monitor
-04_Point cloud\batch files\scan.bat
-
-# 2. Start Rashi AI backend
-cd 01_Innitialization_Backend_UI\AI-generation\backend
-venv\Scripts\python -m uvicorn main:app --port 8001
-
-# 3. Start Rashi frontend
-cd 01_Innitialization_Backend_UI\AI-generation\frontend
-npm run dev
-
-# 4. Start Xio projection server
-cd 02_Projected_UI
-python app.py
-
-# 5. Open projection in browser
-http://localhost:5000/projection
-
-# 6. Open point cloud viewer
-http://localhost:5000/pointcloud-viewer
-```
-
-### Hand monitor only (without scan.bat)
-
-```bat
-py -3.11 "03_Hands recognition\ipad_stream.py"
-```
-
----
-
-## Installation
-
-### Python environments
-
-| Environment | Scripts |
-|---|---|
-| **Python 3.14** (system default) | `scan.bat`, all `04_Point cloud` scripts |
-| **Python 3.11** (`pythoncore-3.11-64`) | `ipad_stream.py` (MediaPipe + OpenNI2) |
-| **Rashi venv** (`01_Innitialization_Backend_UI/AI-generation/backend/venv`) | FastAPI + MiDaS |
-
-### Install Python 3.11 dependencies (hands monitor)
-
-```bat
-py -3.11 -m pip install -r "03_Hands recognition\requirements.txt"
-```
-
-### Install Rashi backend dependencies
-
-```bat
-cd 01_Innitialization_Backend_UI\AI-generation\backend
-python -m venv venv
-venv\Scripts\pip install -r requirements.txt
-
-# PyTorch (CPU):
-venv\Scripts\pip install torch torchvision
-
-# PyTorch (CUDA 12.4):
-venv\Scripts\pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-```
-
-### Install Xio server dependencies
-
-```bat
-cd 02_Projected_UI
-pip install -r requirements.txt
-```
-
-### Install Point cloud capture dependencies
-
-```bat
-cd "04_Point cloud"
-pip install -r requirements.txt
-```
-
-### Orbbec Astra SDK
-
-Install `AstraSDK-v2.1.3` and either add the `bin/` folder to `PATH`, or set the environment variable:
-
-```bat
-set ASTRA_SDK_BIN=<path-to-AstraSDK>\bin
-```
-
-`ipad_stream.py` reads `ASTRA_SDK_BIN` automatically; if unset, OpenNI2 auto-detects the SDK.
-
-### Rashi frontend
-
-```bat
-cd 01_Innitialization_Backend_UI\AI-generation\frontend
-npm install
-```
+| `z_Target heat_PNG_Outpumap_Colourt/` | `target_heatmap.png` | `01_Innitialization_Backend_UI` backend |
+| `z_Target heatmap_Colour_PNG_Output/` | `progress_heatmap.png` | `detect_grey_block.py` |
+| `z_CurrentTargetDesign/` | `current_target.jpg` | `02_Projected_UI/app.py` |
+| `z_Completed Target Design/` | `target_YYYYMMDD.jpg` | `02_Projected_UI/app.py` |
 
 ---
 
 ## Grasshopper Integration
 
-Grasshopper connects to the system via two parallel heatmap workflows that together guide the carving process.
+Grasshopper is a visual programming plugin for **Rhino 3D**, used here to generate and receive carving geometry. The `.gh` files are in `01_Innitialization_Backend_UI/` and `04_Point cloud/Clay-Create/`. Open them in Rhino → Grasshopper.
+
+The system connects to Grasshopper via two heatmap files and a UDP socket.
 
 ### Part 1 — Target Heatmap (AI-generated design)
 
-Before carving begins, the Rashi AI pipeline converts a reference image into a depth-based heightmap. This is split into per-tile target designs and written as a colour-mapped PNG. Grasshopper reads this file to drive the initial carving geometry — it tells the fabricator exactly how deep each zone of the block should be carved.
+Before carving begins, the AI pipeline converts the reference image into a colour-mapped depth PNG per tile. Grasshopper reads this to define the intended carving depth for every zone of the block.
 
-**File read by Grasshopper:**
+**File:**
 ```
 z_Target heat_PNG_Outpumap_Colourt\target_heatmap.png
 ```
+Live endpoint: `http://localhost:5000/api/target-heatmap`
 
-This file is generated by the Rashi backend when a tile is assigned (`POST /api/block/assign`) and served live via:
-```
-http://localhost:5000/api/target-heatmap
-```
+### Part 2 — Progress Heatmap (scan feedback)
 
-### Part 2 — Progress Heatmap (point cloud feedback)
+After every triggered scan, the point cloud is converted into a colour heatmap showing how the current carved surface compares to the target. Grasshopper reads this to provide real-time depth guidance during carving.
 
-While carving is in progress, every time hands leave the block for 5 seconds the Orbbec camera captures a new point cloud. That scan is converted into a colour heatmap showing what has actually been carved versus the target. Grasshopper reads this file to compare the current clay state against the intended design and provide real-time feedback during the session.
-
-**File read by Grasshopper:**
+**File:**
 ```
 z_Target heatmap_Colour_PNG_Output\progress_heatmap.png
 ```
-
-This file is updated after every scan and served live via:
-```
-http://localhost:5000/api/progress-heatmap
-```
+Live endpoint: `http://localhost:5000/api/progress-heatmap`
 
 ### UDP Communication
 
-Grasshopper can also send and receive session state over UDP:
-
 | Direction | Port | Purpose |
 |---|---|---|
-| Grasshopper → Xio | `6005` | Projection geometry (elements, curves, block index) |
-| Xio → Grasshopper | `6006` | Session state updates (also written to `gh_state.json`) |
+| Grasshopper → `02_Projected_UI` | `6005` | Projection geometry (elements, curves, block index) |
+| `02_Projected_UI` → Grasshopper | `6006` | Session state updates |
 
-`gh_state.json` is polled by Grasshopper every 200 ms as an alternative to the UDP socket.
+`gh_state.json` (in `02_Projected_UI/`) is also written after every update and can be polled by Grasshopper every 200 ms as an alternative to UDP.
 
 ---
 
@@ -274,11 +287,11 @@ Grasshopper can also send and receive session state over UDP:
 | Parameter | Value | Where to change |
 |---|---|---|
 | Hand absence timeout | 5 seconds | `03_Hands recognition/ipad_stream.py` → `HANDS_TIMEOUT` |
-| Clay block size | 15 × 15 × 3 cm | `01_Innitialization_Backend_UI/AI-generation/backend` — exporter |
+| Clay block size | 15 × 15 × 3 cm | `01_Innitialization_Backend_UI/AI-generation/backend/pipeline/exporter.py` |
 | Tile size | 256 × 256 px | `tile_manager.py` |
-| MiDaS weight | 80% depth + 20% luminance | `main.py` → `enhance_heightmap` |
+| MiDaS depth weight | 80% depth + 20% luminance | `main.py` → `enhance_heightmap` |
 | Orbbec resolution | 640 × 480 @ 30 fps | `ipad_stream.py` → stream setup |
-| Point cloud orientation | Y-flip + 90° CW rotation | `detect_grey_block.py` → `process()` |
+| Point cloud orientation | Y-flip + 90° CW | `detect_grey_block.py` → `process()` |
 
 ---
 
