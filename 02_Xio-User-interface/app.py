@@ -85,9 +85,25 @@ def ai_heightmap():
         return Response(status=404)
 
 
+@app.route('/pointcloud-viewer')
+def pointcloud_viewer():
+    return render_template('pointcloud_viewer.html')
+
+@app.route('/api/current-pointcloud')
+def current_pointcloud():
+    path = os.path.join(_WORKSPACE, 'z_Current Point cloud', 'current_pointcloud.ply')
+    if not os.path.exists(path):
+        return Response(status=404)
+    with open(path, 'rb') as f:
+        data = f.read()
+    return Response(data, mimetype='application/octet-stream', headers={
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+    })
+
+
 @app.route('/api/target-heatmap')
 def target_heatmap():
-    path = r'C:\Users\Bhavana\Documents\Hardware 3\z_Target heat_PNG_Outpumap_Colourt\target_heatmap.png'
+    path = os.path.join(_WORKSPACE, 'z_Target heat_PNG_Outpumap_Colourt', 'target_heatmap.png')
     if not os.path.exists(path):
         return Response(status=404)
     with open(path, 'rb') as f:
@@ -99,7 +115,7 @@ def target_heatmap():
 
 @app.route('/api/progress-heatmap')
 def progress_heatmap():
-    path = r'C:\Users\Bhavana\Documents\Hardware 3\z_Target heatmap_Colour_PNG_Output\progress_heatmap.png'
+    path = os.path.join(_WORKSPACE, 'z_Target heatmap_Colour_PNG_Output', 'progress_heatmap.png')
     if not os.path.exists(path):
         return Response(status=404)
     with open(path, 'rb') as f:
@@ -221,8 +237,8 @@ def send_to_grasshopper(payload):
 
 # ─── TRIGGER FILE WATCHER (emits image_update when either heatmap changes) ─────
 WATCH_FILES = [
-    r"C:\Users\Bhavana\Documents\Hardware 3\z_Target heat_PNG_Outpumap_Colourt\target_heatmap.png",
-    r"C:\Users\Bhavana\Documents\Hardware 3\z_Target heatmap_Colour_PNG_Output\progress_heatmap.png",
+    os.path.join(_WORKSPACE, 'z_Target heat_PNG_Outpumap_Colourt', 'target_heatmap.png'),
+    os.path.join(_WORKSPACE, 'z_Target heatmap_Colour_PNG_Output', 'progress_heatmap.png'),
 ]
 
 def trigger_watcher():

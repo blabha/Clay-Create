@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Point Cloud Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111; color:#eee; font-family:sans-serif; overflow:hidden; }
+  #drop {
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; background:#111; z-index:10;
+  }
+  #drop h2 { color:#777; font-size:1rem; letter-spacing:0.1em; }
+  #drop label {
+    padding:10px 28px; background:#1c1c1c; border:1px solid #444;
+    border-radius:6px; cursor:pointer; color:#bbb; font-size:0.85rem;
+  }
+  #drop label:hover { background:#252525; color:#fff; }
+  #drop input { display:none; }
+  #drop small { color:#333; font-size:10px; }
+  canvas { display:block; }
+  #status { position:fixed; top:12px; right:14px; font-size:11px; color:#666; }
+  #info   { position:fixed; bottom:12px; left:14px; font-size:10px; color:#333; }
+  #reopen {
+    display:none; position:fixed; top:12px; left:14px;
+    padding:5px 12px; background:#1c1c1c; border:1px solid #333;
+    border-radius:4px; cursor:pointer; color:#777; font-size:11px;
+  }
+  #reopen:hover { color:#ccc; }
+</style>
+</head>
+<body>
+
+<div id="drop">
+  <h2>POINT CLOUD VIEWER</h2>
+  <label>Open .ply file <input type="file" id="fileInput" accept=".ply"></label>
+  <small>or drag &amp; drop a .ply anywhere</small>
+</div>
+
+<button id="reopen" onclick="document.getElementById('fileInput').click()">Open file</button>
+<div id="status"></div>
+<div id="info">drag · scroll to zoom · right-drag to pan</div>
+
+<script>
+// ── Three.js scene ────────────────────────────────────────────────────────────
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x111111);
+document.body.appendChild(renderer.domElement);
+
+var scene  = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.0001, 10000);
+camera.position.set(0, 0.3, 1.5);
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+
+window.addEventListener('resize', function () {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+(function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+
+// ── PLY parser ────────────────────────────────────────────────────────────────
+function parsePLY(buffer) {
+  var bytes = new Uint8Array(buffer);
+
+  // Find end_header\n
+  var marker = 'end_header\n';
+  var headerEnd = -1;
+  outer: for (var i = 0; i < bytes.length - marker.length; i++) {
+    for (var j = 0; j < marker.length; j++) {
+      if (bytes[i + j] !== marker.charCodeAt(j)) continue outer;
+    }
+    headerEnd = i + marker.length;
+    break;
+  }
+  // Also try end_header\r\n
+  if (headerEnd === -1) {
+    marker = 'end_header\r\n';
+    outer2: for (var i = 0; i < bytes.length - marker.length; i++) {
+      for (var j = 0; j < marker.length; j++) {
+        if (bytes[i + j] !== marker.charCodeAt(j)) continue outer2;
+      }
+      headerEnd = i + marker.length;
+      break;
+    }
+  }
+  if (headerEnd === -1) throw new Error('end_header not found in file');
+
+  var header = new TextDecoder('ascii').decode(bytes.slice(0, headerEnd));
+
+  var vcMatch = header.match(/element vertex (\d+)/);
+  if (!vcMatch) throw new Error('vertex count missing');
+  var n = parseInt(vcMatch[1]);
+  if (n === 0) throw new Error('Point cloud has 0 vertices');
+
+  // Parse ordered property list
+  var props = [];
+  var typeSize = { float:4, float32:4, double:8, float64:8,
+                   uchar:1, uint8:1, char:1, int8:1,
+                   ushort:2, uint16:2, short:2, int16:2,
+                   uint:4, uint32:4, int:4, int32:4 };
+  var re = /^property\s+(\S+)\s+(\S+)/mg, m;
+  while ((m = re.exec(header)) !== null) {
+    props.push({ type: m[1].toLowerCase(), name: m[2].toLowerCase() });
+  }
+
+  var stride = 0;
+  var offsets = [];
+  for (var pi = 0; pi < props.length; pi++) {
+    offsets.push(stride);
+    stride += (typeSize[props[pi].type] || 4);
+  }
+
+  // slice() creates a fresh zero-based buffer — avoids alignment errors with DataView(buf, offset)
+  var dataBuf  = buffer.slice(headerEnd);
+  var dv       = new DataView(dataBuf);
+  var maxN     = Math.floor(dataBuf.byteLength / stride);
+  if (maxN < n) { console.warn('PLY truncated: using ' + maxN + ' of ' + n); n = maxN; }
+
+  var xs = new Float32Array(n), ys = new Float32Array(n), zs = new Float32Array(n);
+  var rs = new Uint8Array(n),   gs = new Uint8Array(n),   bs = new Uint8Array(n);
+
+  for (var i = 0; i < n; i++) {
+    var base = i * stride;
+    for (var pi = 0; pi < props.length; pi++) {
+      var p = props[pi], o = base + offsets[pi], v;
+      var t = p.type;
+      if      (t === 'float'   || t === 'float32') v = dv.getFloat32(o, true);
+      else if (t === 'uchar'   || t === 'uint8')   v = dv.getUint8(o);
+      else if (t === 'double'  || t === 'float64') v = dv.getFloat64(o, true);
+      else if (t === 'int'     || t === 'int32')   v = dv.getInt32(o, true);
+      else if (t === 'uint'    || t === 'uint32')  v = dv.getUint32(o, true);
+      else if (t === 'short'   || t === 'int16')   v = dv.getInt16(o, true);
+      else if (t === 'ushort'  || t === 'uint16')  v = dv.getUint16(o, true);
+      else v = dv.getUint8(o);
+      var nm = p.name;
+      if      (nm === 'x')                    xs[i] = v;
+      else if (nm === 'y')                    ys[i] = v;
+      else if (nm === 'z')                    zs[i] = v;
+      else if (nm === 'red'   || nm === 'r')  rs[i] = v;
+      else if (nm === 'green' || nm === 'g')  gs[i] = v;
+      else if (nm === 'blue'  || nm === 'b')  bs[i] = v;
+    }
+  }
+  return { n:n, xs:xs, ys:ys, zs:zs, rs:rs, gs:gs, bs:bs };
+}
+
+// ── Show point cloud ──────────────────────────────────────────────────────────
+var status = document.getElementById('status');
+var ptMesh = null;
+
+function showCloud(buffer, name) {
+  var parsed;
+  try { parsed = parsePLY(buffer); }
+  catch(e) { status.textContent = 'Error: ' + e.message; status.style.color = '#c55'; return; }
+
+  var n = parsed.n, xs = parsed.xs, ys = parsed.ys, zs = parsed.zs;
+  var rs = parsed.rs, gs = parsed.gs, bs = parsed.bs;
+
+  var cx = 0, cy = 0, cz = 0;
+  for (var i = 0; i < n; i++) { cx += xs[i]; cy += ys[i]; cz += zs[i]; }
+  cx /= n; cy /= n; cz /= n;
+
+  var maxR = 0;
+  var pos = new Float32Array(n * 3);
+  var col = new Float32Array(n * 3);
+  for (var i = 0; i < n; i++) {
+    var dx = xs[i]-cx, dy = ys[i]-cy, dz = zs[i]-cz;
+    pos[i*3]=dx; pos[i*3+1]=dy; pos[i*3+2]=dz;
+    col[i*3]=rs[i]/255; col[i*3+1]=gs[i]/255; col[i*3+2]=bs[i]/255;
+    var r = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    if (r > maxR) maxR = r;
+  }
+
+  if (ptMesh) { scene.remove(ptMesh); ptMesh.geometry.dispose(); ptMesh.material.dispose(); }
+
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+
+  var mat = new THREE.PointsMaterial({
+    size: Math.max(maxR * 0.006, 0.0005),
+    vertexColors: true,
+    sizeAttenuation: true
+  });
+
+  ptMesh = new THREE.Points(geo, mat);
+  scene.add(ptMesh);
+
+  camera.position.set(0, maxR * 0.5, maxR * 2.5);
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  status.textContent = name + '  ·  ' + n.toLocaleString() + ' pts';
+  status.style.color = '#5a5';
+  document.getElementById('drop').style.display   = 'none';
+  document.getElementById('reopen').style.display = 'block';
+}
+
+function readFile(file) {
+  var r = new FileReader();
+  r.onload = function(e) { showCloud(e.target.result, file.name); };
+  r.readAsArrayBuffer(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  if (e.target.files[0]) readFile(e.target.files[0]);
+});
+document.addEventListener('dragover', function(e) { e.preventDefault(); });
+document.addEventListener('drop', function(e) {
+  e.preventDefault();
+  var f = e.dataTransfer.files[0];
+  if (f && f.name.toLowerCase().endsWith('.ply')) readFile(f);
+});
+</script>
+</body>
+</html>

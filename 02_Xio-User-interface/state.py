@@ -15,6 +15,7 @@ class SessionState:
         self.active_block     = None
         self.last_done        = None
         self._projection      = None
+        self.session_time     = 0
 
     def start(self, cols, rows, participants):
         self.reset()

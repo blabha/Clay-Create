@@ -10,6 +10,7 @@ import sys
 import os
 import math
 import ctypes
+from pathlib import Path
 import numpy as np
 import cv2
 import mediapipe as mp
@@ -25,18 +26,18 @@ except ImportError:
     print("ERROR: 'openni' package not found.  Run: py -3.11 -m pip install openni")
     sys.exit(1)
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-OPENNI2_RUNTIME = (
-    r"C:\Users\Bhavana\Downloads"
-    r"\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64"
-    r"\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\bin"
-)
-SCAN_SCRIPT        = r"C:\Users\Bhavana\Documents\Hardware 3\04_Point cloud\python\capture_grey_block.py"
-PYTHON_EXE         = r"C:\Users\Bhavana\AppData\Local\Python\pythoncore-3.11-64\python.exe"
-ROI_CONFIG         = r"C:\Users\Bhavana\Documents\Hardware 3\04_Point cloud\roi_config.txt"
-CURRENT_HEATMAP    = r"C:\Users\Bhavana\Documents\Hardware 3\z_Current Heatmap_PNG\current_heatmap.png"
-HISTORY_HEATMAP    = r"C:\Users\Bhavana\Documents\Hardware 3\z_History Heatmap_PNG"
-HANDS_TIMEOUT      = 5.0   # seconds of absent hands before triggering scan
+# ── Paths (all relative to this file's location) ──────────────────────────────
+_HERE = Path(__file__).parent          # 03_Hands recognition/
+_ROOT = _HERE.parent                   # project root (Hardware 3/)
+
+# Astra SDK bin directory — override with ASTRA_SDK_BIN env var if needed
+OPENNI2_RUNTIME = os.environ.get("ASTRA_SDK_BIN") or None
+SCAN_SCRIPT     = str(_ROOT / "04_Point cloud" / "python" / "capture_grey_block.py")
+PYTHON_EXE      = sys.executable       # whichever python launched this script
+ROI_CONFIG      = str(_ROOT / "04_Point cloud" / "roi_config.txt")
+CURRENT_HEATMAP = str(_ROOT / "z_Current Heatmap_PNG" / "current_heatmap.png")
+HISTORY_HEATMAP = str(_ROOT / "z_History Heatmap_PNG")
+HANDS_TIMEOUT   = 5.0   # seconds of absent hands before triggering scan
 
 W, H = 640, 480
 

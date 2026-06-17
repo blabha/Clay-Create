@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Point Cloud Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; color: #eee; font-family: monospace; overflow: hidden; }
+  #canvas-container { width: 100vw; height: 100vh; }
+  #ui {
+    position: fixed; top: 16px; left: 16px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 10;
+  }
+  button {
+    background: #222; color: #ccc; border: 1px solid #444;
+    padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  }
+  button:hover { background: #333; color: #fff; }
+  #info {
+    position: fixed; bottom: 16px; left: 16px; font-size: 11px; color: #666;
+  }
+  #status {
+    position: fixed; top: 16px; right: 16px; font-size: 11px; color: #888;
+  }
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div id="ui">
+  <button onclick="loadCloud()">↺ Reload</button>
+  <button onclick="resetCamera()">⊙ Reset view</button>
+  <button id="autoBtn" onclick="toggleAuto()">Auto-reload: OFF</button>
+</div>
+
+<div id="status">Loading...</div>
+<div id="info">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+
+// ── Scene setup ───────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x111111);
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.001, 100);
+camera.position.set(0, 0.3, 0.8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// Axes helper (small, in corner via a separate scene)
+const axesHelper = new THREE.AxesHelper(0.05);
+scene.add(axesHelper);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Point cloud load ──────────────────────────────────────────────────────────
+let pointsMesh = null;
+const loader   = new PLYLoader();
+const status   = document.getElementById('status');
+
+window.loadCloud = function () {
+  status.textContent = 'Loading...';
+  status.style.color = '#888';
+
+  loader.load(
+    '/api/current-pointcloud?t=' + Date.now(),
+    (geometry) => {
+      geometry.computeBoundingBox();
+      const box    = geometry.boundingBox;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      geometry.translate(-center.x, -center.y, -center.z);
+
+      const size   = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      if (pointsMesh) { scene.remove(pointsMesh); pointsMesh.geometry.dispose(); }
+
+      const material = new THREE.PointsMaterial({
+        size: maxDim * 0.004,
+        vertexColors: geometry.hasAttribute('color'),
+        color: geometry.hasAttribute('color') ? 0xffffff : 0x44aaff,
+        sizeAttenuation: true,
+      });
+
+      pointsMesh = new THREE.Points(geometry, material);
+      scene.add(pointsMesh);
+
+      const n = geometry.attributes.position.count;
+      status.textContent = `${n.toLocaleString()} pts  |  ${(maxDim * 100).toFixed(1)} cm span`;
+      status.style.color = '#5c5';
+    },
+    undefined,
+    (err) => {
+      status.textContent = 'No point cloud found';
+      status.style.color = '#c55';
+    }
+  );
+};
+
+window.resetCamera = function () {
+  camera.position.set(0, 0.3, 0.8);
+  controls.target.set(0, 0, 0);
+  controls.update();
+};
+
+// ── Auto-reload ───────────────────────────────────────────────────────────────
+let autoInterval = null;
+window.toggleAuto = function () {
+  const btn = document.getElementById('autoBtn');
+  if (autoInterval) {
+    clearInterval(autoInterval);
+    autoInterval = null;
+    btn.textContent = 'Auto-reload: OFF';
+  } else {
+    autoInterval = setInterval(loadCloud, 5000);
+    btn.textContent = 'Auto-reload: ON (5s)';
+  }
+};
+
+// ── Render loop ───────────────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+loadCloud();
+</script>
+</body>
+</html>
