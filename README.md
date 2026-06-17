@@ -6,16 +6,24 @@ A co-creative fabrication system where workshop participants each sculpt one cla
 
 ---
 
-## Hardware Requirements
+## Requirements
 
-Before anything else, make sure you have:
+### Hardware
 
 | Hardware | Purpose |
 |---|---|
 | **Orbbec Astra depth camera** | Captures point clouds and RGB frames during scanning and hand monitoring |
 | **Orbbec AstraSDK v2.1.3** | Driver/runtime required to communicate with the camera — download from the Orbbec website |
-| **Projector** | Pointed at the clay wall — displays the target carving design and progress heatmap during each participant's turn |
+| **Projector** | Pointed at table workspace — displays the target carving design and progress heatmap during each participant's turn |
 | **Windows PC** | All scripts are Windows-native (batch files, Python on Windows paths) |
+
+### Materials
+
+| Material | Purpose |
+|---|---|
+| **Clay** | One block per participant (15 × 15 × 3 cm), assembled together to form the full wall relief |
+| **Water** | For keeping clay workable and preventing cracking during carving |
+| **Clay carving tools** | Loops, wire tools, and sculpting knives for removing material and refining the surface |
 
 Set the SDK path once so all scripts can find it:
 
