@@ -7,9 +7,10 @@ import numpy as np
 import cv2
 from openni import openni2
 
-SDK = r"C:\Users\Bhavana\Downloads\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\bin"
+import os
+SDK = os.environ.get("ASTRA_SDK_BIN") or None
 
-openni2.initialize(SDK)
+openni2.initialize(SDK) if SDK else openni2.initialize()
 device = openni2.Device.open_any()
 print(f"Connected: {device.get_device_info()}")
 

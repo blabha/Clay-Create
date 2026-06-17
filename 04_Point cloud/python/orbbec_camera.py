@@ -14,7 +14,8 @@ except ImportError:
     print("ERROR: 'openni' package not found. Run: python -m pip install openni")
     sys.exit(1)
 
-OPENNI2_RUNTIME = r"C:\Users\Bhavana\Downloads\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\bin"
+import os
+OPENNI2_RUNTIME = os.environ.get("ASTRA_SDK_BIN") or None
 
 def main():
     try:

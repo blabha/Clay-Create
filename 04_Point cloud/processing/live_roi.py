@@ -54,8 +54,7 @@ def _init_orbbec():
     from openni import openni2
     from openni import _openni2 as c_api
 
-    search = [
-        r"C:\Users\Bhavana\Downloads\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\bin",
+    search = [s for s in [os.environ.get("ASTRA_SDK_BIN")] if s] + [
         r"C:\Program Files\Orbbec\Astra SDK\lib",
         r"C:\Program Files (x86)\Orbbec\Astra SDK\lib",
         r"C:\Program Files\OpenNI2\Redist",

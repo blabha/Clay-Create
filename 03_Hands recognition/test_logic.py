@@ -23,8 +23,13 @@ import shutil
 import subprocess
 from datetime import datetime
 
-SCAN_SCRIPT = r"C:\Users\Bhavana\Documents\Hardware 3\04_Point cloud\python\capture_grey_block.py"
-PYTHON_EXE  = r"C:\Users\Bhavana\AppData\Local\Python\pythoncore-3.11-64\python.exe"
+import sys
+from pathlib import Path
+_HERE = Path(__file__).parent
+_ROOT = _HERE.parent
+
+SCAN_SCRIPT   = str(_ROOT / "04_Point cloud" / "python" / "capture_grey_block.py")
+PYTHON_EXE    = sys.executable
 HANDS_TIMEOUT = 5.0
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -63,8 +68,9 @@ def crop_to_roi(frame):
     return frame[y:y+h, x:x+w]
 
 # ── Archive / scan (writes to temp files so nothing real is overwritten) ──────
-TMP_HEATMAP = r"C:\Users\Bhavana\AppData\Local\Temp\test_current_heatmap.png"
-TMP_PCD     = r"C:\Users\Bhavana\AppData\Local\Temp\test_current_pointcloud_placeholder.txt"
+import tempfile
+TMP_HEATMAP = os.path.join(tempfile.gettempdir(), "test_current_heatmap.png")
+TMP_PCD     = os.path.join(tempfile.gettempdir(), "test_current_pointcloud_placeholder.txt")
 
 def archive_and_scan(frame):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")

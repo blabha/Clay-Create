@@ -32,11 +32,7 @@ def remove_outliers(points, colors, k=20, std_ratio=2.0):
     print(f"  Kept {keep.sum():,} / {len(points):,} points ({100*keep.sum()/len(points):.1f} %)")
     return points[keep], colors[keep]
 
-OPENNI2_PATH = (
-    r"C:\Users\Bhavana\Downloads"
-    r"\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64"
-    r"\AstraSDK-v2.1.3-94bca0f52e-20210608T034051Z-vs2015-win64\bin"
-)
+OPENNI2_PATH = os.environ.get("ASTRA_SDK_BIN") or None
 W, H = 640, 480
 
 
